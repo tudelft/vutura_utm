@@ -11,6 +11,8 @@
 #include "mavlink_node.h"
 #include <mavlink.h>
 
+#include "proto/amessage.pb-c.h"
+
 #define BUFFER_LENGTH 2041
 
 typedef struct mavlink_node_t
@@ -44,6 +46,15 @@ void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
 		mavlink_global_position_int_t global_pos;
 		mavlink_msg_global_position_int_decode(msg, &global_pos);
 		printf("[%s] got global position lat: %f lon: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7);
+		GPSMessage gps_message = GPSMESSAGE__INIT;
+		uint16_t len;
+		gps_message.lat = global_pos.lat;
+		gps_message.lon = global_pos.lon;
+		gps_message.alt = global_pos.alt;
+		len = gpsmessage__get_packed_size(&gps_message);
+		uint8_t buf[len];
+		gpsmessage__pack(&gps_message, buf);
+		printf("Writing %d serialized bytes\n", len);
 	}
 }
 

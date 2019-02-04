@@ -1,4 +1,8 @@
 build/*
 
+# Generated files
+include/proto/*
+
 # QtCreator IDE
 CMakeLists.txt.user
+.CMakeLists.txt.swp
