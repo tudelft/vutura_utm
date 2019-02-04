@@ -5,5 +5,5 @@ project(vutura_utm)
 find_package(nng CONFIG REQUIRED)
 
 include_directories(include/mavlink/common)
-add_executable(mavlink_node src/mavlink_node.c)
+add_executable(mavlink_node src/mavlink_node/mavlink_node.c)
 target_link_libraries(mavlink_node nng::nng)
