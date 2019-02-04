@@ -39,7 +39,12 @@ void mavlink_node_timer_event(mavlink_node_t *node)
 void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
 {
 	// The message is in the buffer
-	printf("[%s] incoming msg SYS: %d, COMP: %d, LEN: %d, MSGID: %d\n", node->name, msg->sysid, msg->compid, msg->len, msg->msgid);
+	//printf("[%s] incoming msg SYS: %d, COMP: %d, LEN: %d, MSGID: %d\n", node->name, msg->sysid, msg->compid, msg->len, msg->msgid);
+	if (msg->msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
+		mavlink_global_position_int_t global_pos;
+		mavlink_msg_global_position_int_decode(msg, &global_pos);
+		printf("[%s] got global position lat: %f lon: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7);
+	}
 }
 
 int main(int argc, char **argv)
@@ -75,7 +80,7 @@ int main(int argc, char **argv)
 	memset(&node.uav_addr, 0, sizeof(node.uav_addr));
 	node.uav_addr.sin_family = AF_INET;
 	node.uav_addr.sin_addr.s_addr = inet_addr(target_ip);
-	node.uav_addr.sin_port = htons(14550);
+	node.uav_addr.sin_port = htons(14556);
 
 	// Configure periodic timer for heartbeats
 	node.timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
