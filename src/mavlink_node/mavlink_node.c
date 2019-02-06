@@ -76,17 +76,22 @@ void mavlink_node_handle_request(mavlink_node_t *node, nng_msg *msg)
 	Flightplan fp = FLIGHTPLAN__INIT;
 	fp.n_waypoint = 2;
 	Flightplan__Waypoint first_waypoint = FLIGHTPLAN__WAYPOINT__INIT;
+	Flightplan__Waypoint second_waypoint = FLIGHTPLAN__WAYPOINT__INIT;
 
 	// Array of pointers to waypoints
 	Flightplan__Waypoint *all_waypoints[fp.n_waypoint];
 	all_waypoints[0] = &first_waypoint;
-	all_waypoints[1] = &first_waypoint;
+	all_waypoints[1] = &second_waypoint;
 	fp.waypoint = all_waypoints;
 
-	fp.waypoint[0]->lat = 0;
-	fp.waypoint[0]->lon = 0;
-	fp.waypoint[0]->alt = 0;
+	fp.waypoint[0]->lat = 10;
+	fp.waypoint[0]->lon = 20;
+	fp.waypoint[0]->alt = 30;
 	fp.waypoint[0]->has_alt = true;
+
+	fp.waypoint[1]->lat = -10;
+	fp.waypoint[1]->lon = -123;
+	fp.waypoint[1]->has_alt = false;
 
 	unsigned len = flightplan__get_packed_size(&fp);
 	nng_msg_alloc(&msg, len);

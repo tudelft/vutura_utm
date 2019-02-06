@@ -24,3 +24,6 @@ include_directories(include/mavlink/common)
 include_directories(include)
 add_executable(mavlink_node src/mavlink_node/mavlink_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
 target_link_libraries(mavlink_node nng::nng protobuf-c)
+
+add_executable(utm_node src/utm_node/utm_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
+target_link_libraries(utm_node nng::nng protobuf-c)
