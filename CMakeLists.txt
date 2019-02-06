@@ -8,13 +8,19 @@ find_package(Protobuf REQUIRED)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/include/proto)
 
 file(GLOB proto_packages "${CMAKE_SOURCE_DIR}/proto/*.proto")
-message("${proto_packages}")
-execute_process(COMMAND protoc --proto_path=${CMAKE_SOURCE_DIR}/proto --c_out=${CMAKE_SOURCE_DIR}/include/proto ${proto_packages})
+#message("${proto_packages}")b
+message("protoc --dependencies_out --proto_path=${CMAKE_SOURCE_DIR}/proto --c_out=${CMAKE_SOURCE_DIR}/include/proto ${proto_packages}")
+add_custom_command(
+    PRE_BUILD
+    COMMAND protoc --proto_path=${CMAKE_SOURCE_DIR}/proto --c_out=${CMAKE_SOURCE_DIR}/include/proto ${proto_packages}
+    DEPENDS ${CMAKE_SOURCE_DIR}/proto/messages.proto
+    OUTPUT ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h
+)
 
 file(GLOB proto_c_files ${CMAKE_SOURCE_DIR}/include/proto/*.c)
-message("${proto_c_files}")
+#message("${proto_c_files}")
 
 include_directories(include/mavlink/common)
 include_directories(include)
-add_executable(mavlink_node src/mavlink_node/mavlink_node.c ${proto_c_files})
+add_executable(mavlink_node src/mavlink_node/mavlink_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
 target_link_libraries(mavlink_node nng::nng protobuf-c)

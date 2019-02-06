@@ -1,0 +1,27 @@
+syntax = "proto2";
+
+message GPSMessage {
+  required uint64 timestamp = 1;
+  required sint32 lat = 2;
+  required sint32 lon = 3;
+  required int32 alt = 4;
+}
+
+enum MavCommands {
+  START_MISSION = 1;
+  PAUSE_MISSION = 2;
+  CONTINUE_MISSION = 3;
+}
+
+message MavCommand {
+  required MavCommands command = 1;
+}
+
+message Flightplan {
+  message Waypoint {
+    required sint32 lat = 1;
+    required sint32 lon = 2;
+    optional sint32 alt = 3;
+  }
+  repeated Waypoint waypoint = 1;
+}

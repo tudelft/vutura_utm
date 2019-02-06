@@ -8,10 +8,13 @@
 #include <poll.h>
 #include <sys/timerfd.h>
 
+#include <nng/nng.h>
+#include <nng/protocol/reqrep0/rep.h>
+
 #include "mavlink_node.h"
 #include <mavlink.h>
 
-#include "proto/amessage.pb-c.h"
+#include "proto/messages.pb-c.h"
 
 #define BUFFER_LENGTH 2041
 
@@ -23,10 +26,13 @@ typedef struct mavlink_node_t
 	struct sockaddr_in uav_addr;
 	struct sockaddr_in loc_addr;
 	uint8_t buf[BUFFER_LENGTH];
+	nng_socket rep_fp_socket;
+	int rep_fp_fd;
 } mavlink_node_t;
 
 void mavlink_node_timer_event(mavlink_node_t *node);
 void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg);
+void mavlink_node_handle_request(mavlink_node_t *node, nng_msg *msg);
 
 void mavlink_node_timer_event(mavlink_node_t *node)
 {
@@ -35,7 +41,7 @@ void mavlink_node_timer_event(mavlink_node_t *node)
 	mavlink_msg_heartbeat_pack(1, 200, &msg, MAV_TYPE_HELICOPTER, MAV_AUTOPILOT_GENERIC, MAV_MODE_GUIDED_ARMED, 0, MAV_STATE_ACTIVE);
 	uint16_t len = mavlink_msg_to_send_buffer(node->buf, &msg);
 	int bytes_sent = sendto(node->uav_sock, node->buf, len, 0, (struct sockaddr*)&node->uav_addr, sizeof(struct sockaddr_in));
-	printf("[%s] sent heartbeat %d bytes\n", node->name, bytes_sent);
+	//printf("[%s] sent heartbeat %d bytes\n", node->name, bytes_sent);
 }
 
 void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
@@ -45,17 +51,56 @@ void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
 	if (msg->msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
 		mavlink_global_position_int_t global_pos;
 		mavlink_msg_global_position_int_decode(msg, &global_pos);
-		printf("[%s] got global position lat: %f lon: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7);
+		//printf("[%s] got global position lat: %f lon: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7);
 		GPSMessage gps_message = GPSMESSAGE__INIT;
 		uint16_t len;
+		gps_message.timestamp = 0;
 		gps_message.lat = global_pos.lat;
 		gps_message.lon = global_pos.lon;
 		gps_message.alt = global_pos.alt;
 		len = gpsmessage__get_packed_size(&gps_message);
 		uint8_t buf[len];
 		gpsmessage__pack(&gps_message, buf);
-		printf("Writing %d serialized bytes\n", len);
+		//printf("Writing %d serialized bytes\n", len);
 	}
+}
+
+void mavlink_node_handle_request(mavlink_node_t *node, nng_msg *msg)
+{
+	// This function needs to free the msg when finished using it
+	printf("Got %s\theader length: %lu\n", (char*)nng_msg_body(msg), nng_msg_header_len(msg));
+
+	// send reply
+	nng_msg_clear(msg);
+
+	Flightplan fp = FLIGHTPLAN__INIT;
+	fp.n_waypoint = 2;
+	Flightplan__Waypoint first_waypoint = FLIGHTPLAN__WAYPOINT__INIT;
+
+	// Array of pointers to waypoints
+	Flightplan__Waypoint *all_waypoints[fp.n_waypoint];
+	all_waypoints[0] = &first_waypoint;
+	all_waypoints[1] = &first_waypoint;
+	fp.waypoint = all_waypoints;
+
+	fp.waypoint[0]->lat = 0;
+	fp.waypoint[0]->lon = 0;
+	fp.waypoint[0]->alt = 0;
+	fp.waypoint[0]->has_alt = true;
+
+	unsigned len = flightplan__get_packed_size(&fp);
+	nng_msg_alloc(&msg, len);
+	flightplan__pack(&fp, nng_msg_body(msg));
+
+	// This function frees the msg
+	nng_sendmsg(node->rep_fp_socket, msg, NNG_FLAG_NONBLOCK);
+}
+
+void
+fatal(const char *func, int rv)
+{
+	fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
+	exit(1);
 }
 
 int main(int argc, char **argv)
@@ -63,8 +108,11 @@ int main(int argc, char **argv)
 	mavlink_node_t node = {
 		.name = "mavlink",
 		.uav_sock = -1,
-		.timerfd = -1
+		.timerfd = -1,
+		.rep_fp_fd = -1
 	};
+
+	int rv;
 
 	printf("Starting mavlink_node\n");
 
@@ -104,8 +152,21 @@ int main(int argc, char **argv)
 		perror("setting timer");
 	}
 
+	// Configure reply topic for flightplan request
+	if ((rv = nng_rep0_open(&node.rep_fp_socket)) != 0) {
+		fatal("nng_rep0_open", rv);
+	}
+
+	if ((rv = nng_listen(node.rep_fp_socket, "ipc:///tmp/fp.sock", NULL, NNG_FLAG_NONBLOCK))) {
+		fatal("nng_listen", rv);
+	}
+
+	if ((rv = nng_getopt_int(node.rep_fp_socket, NNG_OPT_RECVFD, &node.rep_fp_fd))) {
+		fatal("nng_getopt", rv);
+	}
+
 	// Configure file descriptors for event listening
-	const unsigned int num_fds = 2;
+	const unsigned int num_fds = 3;
 	struct pollfd fds[num_fds];
 	fds[0].fd = node.uav_sock;
 	fds[0].events = POLLIN;
@@ -114,6 +175,10 @@ int main(int argc, char **argv)
 	fds[1].fd = node.timerfd;
 	fds[1].events = POLLIN;
 	fds[1].revents = 0;
+
+	fds[2].fd = node.rep_fp_fd;
+	fds[2].events = POLLIN;
+	fds[2].revents = 0;
 
 	bool should_exit = false;
 
@@ -150,6 +215,12 @@ int main(int argc, char **argv)
 			//printf("call mavlink_node_timer_event\n");
 			mavlink_node_timer_event(&node);
 			//printf("finished call\n\n");
+		}
+
+		if (fds[2].revents == POLLIN) {
+			nng_msg *fp_msg;
+			nng_recvmsg(node.rep_fp_socket, &fp_msg, NNG_FLAG_NONBLOCK);
+			mavlink_node_handle_request(&node, fp_msg);
 		}
 	}
 }
