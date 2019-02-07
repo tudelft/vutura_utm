@@ -6,6 +6,7 @@
 #include <poll.h>
 
 #include <curl/curl.h>
+#include <cjson/cJSON.h>
 
 #include "proto/messages.pb-c.h"
 
@@ -55,6 +56,18 @@ size_t write_data_callback(void *ptr, size_t size, size_t nmemb, struct url_data
 
 	memcpy((data->data + index), ptr, n);
 	data->data[data->size] = '\0';
+
+	// Try some JSON parsing
+	cJSON *json = cJSON_Parse(data->data);
+
+	if (json == NULL) {
+		fprintf(stderr, "json parse failed");
+	}
+
+	cJSON *access_token = cJSON_GetObjectItemCaseSensitive(json, "access_token");
+	if (cJSON_IsString(access_token) && access_token->valuestring != NULL) {
+		printf("parsed access_token, it is: %s\n", access_token->valuestring);
+	}
 
 	return n;
 }

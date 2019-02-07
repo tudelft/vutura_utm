@@ -4,6 +4,7 @@ project(vutura_utm)
 # Require nng for messaging between nodes
 find_package(nng CONFIG REQUIRED)
 find_package(Protobuf REQUIRED)
+find_package(cJSON REQUIRED)
 
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/include/proto)
 
@@ -29,4 +30,4 @@ add_executable(utm_node src/utm_node/utm_node.c ${CMAKE_SOURCE_DIR}/include/prot
 target_link_libraries(utm_node nng::nng protobuf-c)
 
 add_executable(airmap_node src/airmap_node/airmap_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
-target_link_libraries(airmap_node nng::nng protobuf-c curl)
+target_link_libraries(airmap_node nng::nng protobuf-c curl cjson)
