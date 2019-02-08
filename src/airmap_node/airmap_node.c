@@ -36,12 +36,13 @@ typedef struct airmap_node_t
 	airmap_state_t state;
 	char bearer_token[300];
 	char pilot_id[100];
+	char flightplan_id[100];
 	int req_fp_fd;
 } airmap_node_t;
 
 size_t write_data_callback(void *ptr, size_t size, size_t nmemb, struct url_data *data)
 {
-	printf("CALLBACK\n");
+	//printf("CALLBACK\n");
 	size_t index = data->size;
 	size_t n = (size * nmemb);
 	char *tmp;
@@ -123,7 +124,6 @@ int airmap_connect(airmap_node_t *node)
 	cJSON *id_token = cJSON_GetObjectItemCaseSensitive(json, "id_token");
 	if (cJSON_IsString(id_token) && id_token->valuestring != NULL) {
 		size_t len = strlen(id_token->valuestring);
-		printf("bearertokensize = %lu\n", sizeof(node->bearer_token));
 		if ((len + 1) > sizeof(node->bearer_token)) {
 			fprintf(stderr, "id_token too large for storage\n");
 		} else {
@@ -168,8 +168,6 @@ int airmap_get_pilot_id(airmap_node_t *node)
 	char api_header[500];
 	sprintf(token_header, "Authorization: Bearer %s", node->bearer_token);
 	sprintf(api_header, "X-API-Key: %s", AIRMAP_API_KEY);
-	printf("%s\n", token_header);
-	printf("%s\n", api_header);
 
 	list = curl_slist_append(list, token_header);
 	list = curl_slist_append(list, api_header);
@@ -206,7 +204,6 @@ int airmap_get_pilot_id(airmap_node_t *node)
 	if (cJSON_IsObject(user_data)) {
 		cJSON *pilot_id = cJSON_GetObjectItemCaseSensitive(user_data, "id");
 		if (cJSON_IsString(pilot_id) && pilot_id->valuestring != NULL) {
-			printf("pilot_id: %s\n", pilot_id->valuestring);
 			ssize_t len = strlen(pilot_id->valuestring);
 			if ((len + 1) > sizeof(node->pilot_id)) {
 				fprintf(stderr, "pilot_id too large for storage\n");
@@ -313,7 +310,7 @@ int airmap_create_flightplan(airmap_node_t *node)
 	cJSON_AddItemToObject(fp_data, "geometry", geometry);
 
 	char *string = cJSON_Print(fp_data);
-	printf("json string: %s\n\n", string);
+
 	cJSON_Delete(fp_data);
 
 	struct curl_slist *list = NULL;
@@ -329,8 +326,6 @@ int airmap_create_flightplan(airmap_node_t *node)
 	char api_header[500];
 	sprintf(token_header, "Authorization: Bearer %s", node->bearer_token);
 	sprintf(api_header, "X-API-Key: %s", AIRMAP_API_KEY);
-	printf("%s\n", token_header);
-	printf("%s\n", api_header);
 
 	list = curl_slist_append(list, "accept: application/json");
 	list = curl_slist_append(list, "content-type: application/json; charset=utf-8");
@@ -355,7 +350,33 @@ int airmap_create_flightplan(airmap_node_t *node)
 
 	curl_easy_cleanup(curl);
 
-	printf("Response:\n%s", data.data);
+	// Parse the output to get flightplan id
+	cJSON *json = cJSON_Parse(data.data);
+
+	if (json == NULL) {
+		fprintf(stderr, "json parse failed");
+		free(data.data);
+		free(string);
+		return ret;
+	}
+
+	cJSON *flightplan_data = cJSON_GetObjectItemCaseSensitive(json, "data");
+	if (cJSON_IsObject(flightplan_data)) {
+		cJSON *flightplan_id = cJSON_GetObjectItemCaseSensitive(flightplan_data, "id");
+		if (cJSON_IsString(flightplan_id) && flightplan_id->valuestring != NULL) {
+			ssize_t len = strlen(flightplan_id->valuestring);
+			if ((len + 1) > sizeof(node->flightplan_id)) {
+				fprintf(stderr, "flightplan_id too large for storage\n");
+			} else {
+				// copy pilot_id
+				memset(node->flightplan_id, 0, sizeof(node->flightplan_id));
+				memcpy(node->flightplan_id, flightplan_id->valuestring, len);
+				ret = 0;
+			}
+		}
+	}
+
+	cJSON_Delete(json);
 
 	free(data.data);
 	free(string);
@@ -395,8 +416,6 @@ int airmap_get_active_flights(airmap_node_t *node)
 	char api_header[500];
 	sprintf(token_header, "Authorization: Bearer %s", node->bearer_token);
 	sprintf(api_header, "X-API-Key: %s", AIRMAP_API_KEY);
-	printf("%s\n", token_header);
-	printf("%s\n", api_header);
 
 //	list = curl_slist_append(list, "Accept: application/json");
 //	list = curl_slist_append(list, "Content-type: application/json");
@@ -426,8 +445,6 @@ int airmap_get_active_flights(airmap_node_t *node)
 	}
 
 	curl_easy_cleanup(curl);
-
-	printf("GOT DATA:\n%s\n", data.data);
 
 	// memory allocation for *json
 	cJSON *json = cJSON_Parse(data.data);
@@ -487,6 +504,8 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+	printf("Got token:\t%s\n", node.bearer_token);
+
 	if ((rv = airmap_get_pilot_id(&node)) == 0) {
 		node.state = AIRMAP_STATE_GOT_PILOT_ID;
 
@@ -494,6 +513,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, "airmap_get_pilot_id failed\n");
 		exit(EXIT_FAILURE);
 	}
+
+	printf("Got pilot_id:\t%s\n", node.pilot_id);
 
 	/*
 	if ((rv = airmap_get_active_flights(&node)) == 0) {
@@ -508,6 +529,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, "airmap_create_flightplan failed\n");
 		exit(EXIT_FAILURE);
 	}
+
+	printf("Got flightplan_id: %s\n", node.flightplan_id);
 
 	exit(EXIT_SUCCESS);
 }
