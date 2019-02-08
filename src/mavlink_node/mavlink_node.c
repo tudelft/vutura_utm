@@ -71,7 +71,6 @@ void mavlink_node_handle_request(mavlink_node_t *node, nng_msg *msg)
 	printf("Got %s\theader length: %lu\n", (char*)nng_msg_body(msg), nng_msg_header_len(msg));
 
 	// send reply
-	nng_msg_clear(msg);
 
 	Flightplan fp = FLIGHTPLAN__INIT;
 	fp.n_waypoint = 2;
@@ -94,11 +93,11 @@ void mavlink_node_handle_request(mavlink_node_t *node, nng_msg *msg)
 	fp.waypoint[1]->has_alt = false;
 
 	unsigned len = flightplan__get_packed_size(&fp);
-	nng_msg_alloc(&msg, len);
+	nng_msg_realloc(msg, len);
 	flightplan__pack(&fp, nng_msg_body(msg));
 
 	// This function frees the msg
-	nng_sendmsg(node->rep_fp_socket, msg, NNG_FLAG_NONBLOCK);
+	nng_sendmsg(node->rep_fp_socket, msg, 0);
 }
 
 void
@@ -171,7 +170,7 @@ int main(int argc, char **argv)
 	}
 
 	// Configure file descriptors for event listening
-	const unsigned int num_fds = 3;
+	const unsigned int num_fds = 2;
 	struct pollfd fds[num_fds];
 	fds[0].fd = node.uav_sock;
 	fds[0].events = POLLIN;
@@ -220,12 +219,24 @@ int main(int argc, char **argv)
 			//printf("call mavlink_node_timer_event\n");
 			mavlink_node_timer_event(&node);
 			//printf("finished call\n\n");
+			should_exit = true;
 		}
 
 		if (fds[2].revents == POLLIN) {
 			nng_msg *fp_msg;
 			nng_recvmsg(node.rep_fp_socket, &fp_msg, NNG_FLAG_NONBLOCK);
 			mavlink_node_handle_request(&node, fp_msg);
+			if (fp_msg != NULL) {
+				printf("NOT NULL");
+				//free(fp_msg);
+			}
+			should_exit = true;
 		}
 	}
+
+	close(node.timerfd);
+	close(node.uav_sock);
+	nng_close(node.rep_fp_socket);
+
+	return 0;
 }

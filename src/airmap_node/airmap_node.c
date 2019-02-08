@@ -21,7 +21,9 @@ typedef enum airmap_state_t {
 	AIRMAP_STATE_INIT = 0,
 	AIRMAP_STATE_CONNECTED,
 	AIRMAP_STATE_GOT_PILOT_ID,
-	AIRMAP_STATE_FLIGHT_SUBMITTED,
+	AIRMAP_STATE_NO_ACTIVE_FLIGHTS,
+	AIRMAP_STATE_FLIGHTPLAN_CREATED,
+	AIRMAP_STATE_FLIGHTPLAN_SUBMITTED,
 	AIRMAP_STATE_FLIGHT_APPROVED,
 	AIRMAP_STATE_FLIGHT_ACTIVE,
 	AIRMAP_STATE_FLIGHT_COMPLETED
@@ -190,7 +192,7 @@ int airmap_get_pilot_id(airmap_node_t *node)
 
 	curl_easy_cleanup(curl);
 
-	// JSON parsing to get the token out
+	// memory allocation for *json
 	cJSON *json = cJSON_Parse(data.data);
 
 	if (json == NULL) {
@@ -223,6 +225,112 @@ int airmap_get_pilot_id(airmap_node_t *node)
 	return ret;
 }
 
+int airmap_create_flightplan(airmap_node_t *node)
+{
+	int ret = 1;
+
+	struct url_data data;
+	data.size = 0;
+	data.data = malloc(4096);
+
+	if (data.data == NULL) {
+		fprintf(stderr, "malloc failed");
+		return ret;
+	}
+	data.data[0] = '\0';
+
+	struct curl_slist *list = NULL;
+
+	CURL *curl = curl_easy_init();
+	if (!curl) {
+		printf("fail curl easy init");
+		free(data.data);
+		return ret;
+	}
+
+	char token_header[350];
+	char api_header[500];
+	sprintf(token_header, "Authorization: Bearer %s", node->bearer_token);
+	sprintf(api_header, "X-API-Key: %s", AIRMAP_API_KEY);
+	printf("%s\n", token_header);
+	printf("%s\n", api_header);
+
+	list = curl_slist_append(list, "accept: application/json");
+	list = curl_slist_append(list, "content-type: application/json; charset=utf-8");
+	list = curl_slist_append(list, token_header);
+	list = curl_slist_append(list, api_header);
+
+	char post_data_fmt[] = "{\"pilot_id\": \"%s\","
+			       "\"start_time\": \"2019-02-08T13:00:00+01:00\","
+			       "\"end_time\": \"2019-02-08T14:00:00+01:00\","
+			       "\"buffer\": 1,"
+			       "\"max_altitude_agl\": 120,"
+			       "\"geometry\": {"
+			       "\"type\":\"Polygon\","
+			       "\"coordinates\":["
+				 "["
+				   "["
+				     "-118.370990753174,"
+				     "33.85505651142062"
+				   "],"
+				   "["
+				     "-118.373050689697,"
+				     "33.85502978214579"
+				   "],"
+				   "["
+				     "-118.37347984314,"
+				     "33.8546733910155"
+				   "],"
+				   "["
+				     "-118.373061418533,"
+				     "33.85231226221667"
+				   "],"
+				   "["
+				     "-118.371934890747,"
+				     "33.85174201755203"
+				   "],"
+				   "["
+				     "-118.369971513748,"
+				     "33.85176874785573"
+				   "],"
+				   "["
+				     "-118.369950056076,"
+				     "33.8528112231754"
+				   "],"
+				   "["
+				     "-118.370990753174,"
+				     "33.85505651142062"
+				   "]"
+				 "]"
+			       "]}}";
+	char post_data[1000];
+	sprintf(post_data, post_data_fmt, node->pilot_id);
+	printf("post_data: %s\n\n", post_data);
+
+	curl_easy_setopt(curl, CURLOPT_URL, "https://" AIRMAP_HOST "/flight/v2/plan");
+	curl_easy_setopt(curl, CURLOPT_POST, 1L);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data_callback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+
+	CURLcode res = curl_easy_perform(curl);
+	curl_slist_free_all(list);
+
+	if (res != CURLE_OK) {
+		fprintf(stderr, "curl return code: %i\n", res);
+		free(data.data);
+		return ret;
+	}
+
+	curl_easy_cleanup(curl);
+
+	printf("Response:\n%s", data.data);
+
+	free(data.data);
+
+}
+
 int main(int argc, char **argv)
 {
 	airmap_node_t node = {
@@ -251,50 +359,12 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	if (node.state == AIRMAP_STATE_GOT_PILOT_ID) {
-		printf("\n\nGOT PILOT ID: %s\n", node.pilot_id);
+	if ((rv = airmap_create_flightplan(&node)) == 0) {
+		node.state = AIRMAP_STATE_FLIGHTPLAN_CREATED;
+
+	} else {
+		fprintf(stderr, "airmap_create_flightplan failed\n");
 	}
 
 	exit(EXIT_SUCCESS);
-
-	CURL *curl = curl_easy_init();
-	if (!curl) {
-		printf("fail");
-		exit(EXIT_FAILURE);
-	}
-
-	char postfields[] = "grant_type=password"
-			    "&client_id=" AIRMAP_CLIENT_ID
-			    "&connection=Username-Password-Authentication"
-			    "&username=" AIRMAP_USERNAME
-			    "&password=" AIRMAP_PASSWORD
-			    "&device=" AIRMAP_DEVICE_ID;
-
-	CURLcode res;
-
-	curl_easy_setopt(curl, CURLOPT_POST, 1L);
-	curl_easy_setopt(curl, CURLOPT_URL, "https://" AIRMAP_SSO_HOST "/oauth/ro");
-	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postfields);
-	//curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 5000);
-
-	res = curl_easy_perform(curl);
-	if (res != CURLE_OK) {
-		printf("return code: %i\n", res);
-	}
-
-	curl_easy_cleanup(curl);
-	exit(EXIT_SUCCESS);
-
-	struct curl_slist *chunk = NULL;
-	chunk = curl_slist_append(chunk, "X-API-Key: " AIRMAP_API_KEY);
-
-	curl_easy_setopt(curl, CURLOPT_URL, "https://api.airmap.com/advisory/v1/weather?latitude=33.92&longitude=-118.45");
-	curl_easy_setopt(curl, CURLOPT_POST, 1L);
-//	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	res = curl_easy_perform(curl);
-	if (res != CURLE_OK) {
-		printf("Problem\n");
-	}
-	curl_easy_cleanup(curl);
-
 }
