@@ -37,6 +37,7 @@ typedef struct airmap_node_t
 	char bearer_token[300];
 	char pilot_id[100];
 	char flightplan_id[100];
+	char flight_id[100];
 	int req_fp_fd;
 } airmap_node_t;
 
@@ -261,6 +262,7 @@ int airmap_create_flightplan(airmap_node_t *node)
 	cJSON *geometry_coordinates_2 = NULL;
 	cJSON *geometry_coordinates_3 = NULL;
 	cJSON *geometry_coordinates_4 = NULL;
+	cJSON *geometry_coordinates_5 = NULL;
 
 	cJSON *fp_data = cJSON_CreateObject();
 	// NO ERROR CHECKINGS IN THE JSON STUFF YET
@@ -274,7 +276,7 @@ int airmap_create_flightplan(airmap_node_t *node)
 	end_time = cJSON_CreateString(end);
 	cJSON_AddItemToObject(fp_data, "end_time", end_time);
 
-	buffer = cJSON_CreateNumber(1);
+	buffer = cJSON_CreateNumber(60);
 	cJSON_AddItemToObject(fp_data, "buffer", buffer);
 
 	max_altitude_agl = cJSON_CreateNumber(120);
@@ -282,9 +284,10 @@ int airmap_create_flightplan(airmap_node_t *node)
 	geometry_coordinates = cJSON_CreateArray();
 	geometry_coordinates_array = cJSON_CreateArray();
 
-	double points[][2] = {{-118.370990753174, 33.85505651142062},
-			      {-118.373050689697, 33.85502978214579},
-			      {-118.37347984314, 33.8546733910155}};
+	double points[][2] = {{4.4171905517578125, 52.170365387094016},
+			      {4.418070316314697, 52.168865084603496},
+			      {4.421203136444092, 52.16958892106857},
+			      {4.420130252838135, 52.17099707827048}};
 
 	geometry_coordinates_1 = cJSON_CreateDoubleArray(points[0], 2);
 	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_1);
@@ -295,8 +298,11 @@ int airmap_create_flightplan(airmap_node_t *node)
 	geometry_coordinates_3 = cJSON_CreateDoubleArray(points[2], 2);
 	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_3);
 
-	geometry_coordinates_4 = cJSON_CreateDoubleArray(points[0], 2);
+	geometry_coordinates_4 = cJSON_CreateDoubleArray(points[3], 2);
 	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_4);
+
+	geometry_coordinates_5 = cJSON_CreateDoubleArray(points[0], 2);
+	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_5);
 
 	cJSON_AddItemToArray(geometry_coordinates, geometry_coordinates_array);
 
@@ -481,7 +487,87 @@ int airmap_get_active_flights(airmap_node_t *node)
 
 int airmap_submit_flightplan(airmap_node_t *node)
 {
+	int ret = 1;
 
+	struct url_data data;
+	data.size = 0;
+	data.data = malloc(4096);
+
+	if (data.data == NULL) {
+		fprintf(stderr, "malloc failed");
+		return ret;
+	}
+	data.data[0] = '\0';
+
+	CURL *curl = curl_easy_init();
+	if (!curl) {
+		printf("fail curl easy init");
+		free(data.data);
+		return ret;
+	}
+
+	char token_header[350];
+	char api_header[500];
+	sprintf(token_header, "Authorization: Bearer %s", node->bearer_token);
+	sprintf(api_header, "X-API-Key: %s", AIRMAP_API_KEY);
+
+	struct curl_slist *list = NULL;
+	list = curl_slist_append(list, "accept: application/json");
+	list = curl_slist_append(list, "content-type: application/json; charset=utf-8");
+	list = curl_slist_append(list, token_header);
+	list = curl_slist_append(list, api_header);
+
+	char url[200];
+	sprintf(url, "https://" AIRMAP_HOST "/flight/v2/plan/%s/submit", node->flightplan_id);
+	printf("url: %s\n", url);
+
+	curl_easy_setopt(curl, CURLOPT_POST, 1L);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data_callback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+
+	CURLcode res = curl_easy_perform(curl);
+	curl_slist_free_all(list);
+	if (res != CURLE_OK) {
+		fprintf(stderr, "curl return code: %i\n", res);
+		free(data.data);
+		return ret;
+	}
+
+	curl_easy_cleanup(curl);
+
+
+	cJSON *json = cJSON_Parse(data.data);
+
+	if (json == NULL) {
+		fprintf(stderr, "json parse failed");
+		free(data.data);
+		return ret;
+	}
+
+	cJSON *flight_data = cJSON_GetObjectItemCaseSensitive(json, "data");
+	if (cJSON_IsObject(flight_data)) {
+		cJSON *flight_id = cJSON_GetObjectItemCaseSensitive(flight_data, "flight_id");
+		if (cJSON_IsString(flight_id) && flight_id->valuestring != NULL) {
+			ssize_t len = strlen(flight_id->valuestring);
+			if ((len + 1) > sizeof(node->flight_id)) {
+				fprintf(stderr, "flight_id too large for storage\n");
+			} else {
+				// copy pilot_id
+				memset(node->flight_id, 0, sizeof(node->flight_id));
+				memcpy(node->flight_id, flight_id->valuestring, len);
+				ret = 0;
+			}
+		}
+	}
+
+	cJSON_Delete(json);
+
+	free(data.data);
+
+	return ret;
 }
 
 int main(int argc, char **argv)
@@ -531,6 +617,16 @@ int main(int argc, char **argv)
 	}
 
 	printf("Got flightplan_id: %s\n", node.flightplan_id);
+
+	if ((rv = airmap_submit_flightplan(&node)) == 0) {
+		node.state = AIRMAP_STATE_FLIGHTPLAN_SUBMITTED;
+
+	} else {
+		fprintf(stderr, "airmap_submit_flightplan failed\n");
+		exit(EXIT_FAILURE);
+	}
+
+	printf("Got flight_id: %s\n", node.flight_id);
 
 	exit(EXIT_SUCCESS);
 }
