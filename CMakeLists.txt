@@ -42,4 +42,4 @@ add_executable(airmap_node src/airmap_node/airmap_node.c ${CMAKE_SOURCE_DIR}/inc
 target_link_libraries(airmap_node nng::nng protobuf-c curl cjson nlohmann_json::nlohmann_json protobuf)
 
 add_executable(airmap_telemetry src/airmap_node/airmap_telemetry.cpp  ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h)
-target_link_libraries(airmap_telemetry nlohmann_json::nlohmann_json protobuf cryptopp curl)
+target_link_libraries(airmap_telemetry nlohmann_json::nlohmann_json protobuf cryptopp curl nng::nng)

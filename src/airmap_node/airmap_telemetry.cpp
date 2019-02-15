@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <iostream>
 #include <unistd.h>
+#include <poll.h>
+
 // udp
 #include <netdb.h>
 // libcurl -- https://curl.haxx.se/libcurl/
@@ -16,6 +18,10 @@
 #include <cryptopp/ccm.h>
 #include <cryptopp/filters.h>
 #include <cryptopp/osrng.h>
+// nanomsg next gen
+#include <nng/nng.h>
+#include <nng/protocol/reqrep0/req.h>
+#include <nng/protocol/reqrep0/rep.h>
 
 #include "airmap_config.h"
 
@@ -454,15 +460,167 @@ private:
 	TelemetrySource *m_source;
 };
 
+class AirmapNode {
+public:
+	AirmapNode() :
+		_communicator(AIRMAP_API_KEY),
+		_encryptionType(1),
+
+		_has_position_data(false),
+		_lat(0),
+		_lon(0)
+	{
+	}
+
+	int start() {
+		if (-1 == _communicator.authenticate()) {
+			std::cout << "Authentication Failed!" << std::endl;
+			return -1;
+		}
+
+		if (-1 == _communicator.get_pilot_id(_pilotID)) {
+			std::cout << "Get Pilot ID Failed!" << std::endl;
+			return -1;
+		}
+		return 0;
+	}
+
+	int request_flight() {
+		if (!has_position_data()) {
+			return -1;
+		}
+
+		if (-1 == _communicator.create_flightplan(_lat, _lon, _pilotID, _flightplanID)) {
+			std::cout << "Flight Creation Failed!" << std::endl;
+			return -1;
+		}
+
+		std::cout << "FlightplanID: " << _flightplanID << std::endl;
+
+		std::string _flightID;
+		if (-1 == _communicator.submit_flight(_flightplanID, _flightID)) {
+			std::cout << "Flight Submission Failed!" << std::endl;
+			return -1;
+		}
+
+		std::cout << "FlightID: " << _flightID << std::endl;
+	}
+
+	int start_flight() {
+
+	}
+
+	int end_flight() {
+
+	}
+
+	int set_position(float latitude, float longitude) {
+		_lat = latitude;
+		_lon = longitude;
+		_has_position_data = true;
+	}
+
+
+private:
+
+	bool has_position_data() { return _has_position_data; }
+
+	Communicator _communicator;
+	const uint8_t _encryptionType;
+	std::string _pilotID;
+	std::string _flightplanID;
+	std::string _flightID;
+
+	bool _has_position_data;
+	double _lat;
+	double _lon;
+};
+
+void handle_request(AirmapNode* node, nng_msg *msg)
+{
+	node->request_flight();
+}
+
+void fatal(const char *func, int rv)
+{
+	fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
+	exit(1);
+}
+
 // main
 int main(int argc, char* argv[])
 {
-	// API Key
-	const std::string apiKey = AIRMAP_API_KEY;
-	// latitude
+	AirmapNode node;
+	// authenticate etc
+	node.start();
+
 	const float latitude = 52.170365387094016;
 	// longitude
 	const float longitude = 4.4171905517578125;
+
+	node.set_position(latitude, longitude);
+
+	// Listen for nng messages in an event loop
+	nng_socket utmsp_sock;
+	int utmsp_fd = -1;
+	int rv;
+
+	// Configure reply topic for utmsp request
+	if ((rv = nng_rep0_open(&utmsp_sock)) != 0) {
+		fatal("nng_rep0_open", rv);
+	}
+
+	if ((rv = nng_listen(utmsp_sock, "ipc:///tmp/utmsp.sock", NULL, NNG_FLAG_NONBLOCK))) {
+		fatal("nng_listen", rv);
+	}
+
+	if ((rv = nng_getopt_int(utmsp_sock, NNG_OPT_RECVFD, &utmsp_fd))) {
+		fatal("nng_getopt", rv);
+	}
+
+	// Configure file descriptors for event listening
+	const unsigned int num_fds = 1;
+	struct pollfd fds[num_fds];
+	fds[0].fd = utmsp_fd;
+	fds[0].events = POLLIN;
+	fds[0].revents = 0;
+
+	bool should_exit = false;
+	while (!should_exit) {
+		int rv = poll(fds, num_fds, 3000);
+		if (rv == 0) {
+			std::cout << "Timeout..." << std::endl;
+			continue;
+		}
+
+		if (fds[0].revents & POLLIN) {
+			const char* reply = "Hallo!";
+			nng_msg *msg;
+			nng_recvmsg(utmsp_sock, &msg, 0);
+			std::cout << (char*)nng_msg_body(msg) << " " << strlen(reply) << std::endl;
+			handle_request(&node, msg);
+			nng_msg_realloc(msg, strlen(reply));
+			memcpy((char*)nng_msg_body(msg), reply, strlen(reply));
+			nng_sendmsg(utmsp_sock, msg, 0);
+		}
+	}
+
+
+
+
+	return 0;
+
+
+
+
+
+
+	// API Key
+	const std::string apiKey = AIRMAP_API_KEY;
+	// latitude
+//	const float latitude = 52.170365387094016;
+	// longitude
+//	const float longitude = 4.4171905517578125;
 	// aes-256-cbc
 	const uint8_t encryptionType = 1;
 
