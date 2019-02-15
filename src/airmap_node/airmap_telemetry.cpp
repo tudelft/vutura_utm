@@ -25,7 +25,20 @@
 // simple sawtooth wave simulation
 #define BUMP(val, dt, mx, initval) val += dt; if (val > mx) val = initval; return val;
 
-class Simulator
+class TelemetrySource {
+public:
+	virtual std::uint64_t getTimeStamp();
+	virtual double getLattitude();
+	virtual double getLongtitude();
+	virtual float getAgl();
+	virtual float getMsl();
+	virtual float getHorizAccuracy();
+
+private:
+
+};
+
+class Simulator : public TelemetrySource
 {
 public:
 	Simulator() {
@@ -34,12 +47,12 @@ public:
 	void init() {
 		m_lat = 52.170365387094016;
 		m_lon = 4.4171905517578125;
-		m_agl = 0.0;
-		m_msl = 0.0;
+		m_agl = 10.0;
+		m_msl = 10.0;
 		m_horizAccuracy = 0.0;
 		m_yaw = 0.0;
-		m_pitch = -90.0;
-		m_roll = -90.0;
+		m_pitch = 0.0;
+		m_roll = 0.0;
 		m_velocity_x = 10.0;
 		m_velocity_y = 10.0;
 		m_velocity_z = 10.0;
@@ -52,18 +65,18 @@ public:
 		return static_cast<std::uint64_t>(tp.tv_sec) * 1000L + tp.tv_usec / 1000;
 	}
 
-	double getLattitude() { BUMP(m_lat, 0.00002, 90, 52.170365387094016) }
+	double getLattitude() { BUMP(m_lat, 0.00000, 90, 52.170365387094016) }
 	double getLongtitude() { BUMP(m_lon, 0.00002, 90, 4.4171905517578125) }
-	float getAgl() { BUMP(m_agl, 1.0, 100.0, 0.0) }
-	float getMsl() { BUMP(m_msl, 1.0, 100.0, 0.0) }
-	float getHorizAccuracy() { BUMP(m_horizAccuracy, 1.0, 10.0, 0.0) }
+	float getAgl() { BUMP(m_agl, 0.0, 100.0, 10.0) }
+	float getMsl() { BUMP(m_msl, 0.0, 100.0, 10.0) }
+	float getHorizAccuracy() { BUMP(m_horizAccuracy, 0.0, 10.0, 10.0) }
 	float getYaw() { BUMP(m_yaw, 1.0, 360.0, 0.0) }
-	float getPitch() { BUMP(m_pitch, 1.0, 90.0, -90.0) }
-	float getRoll() { BUMP(m_roll, 1.0, 90.0, -90.0) }
-	float getVelocityX() { BUMP(m_velocity_x, 1.0, 100.0, 10.0) }
-	float getVelocityY() { BUMP(m_velocity_y, 1.0, 100.0, 10.0) }
-	float getVelocityZ() { BUMP(m_velocity_z, 1.0, 100.0, 10.0) }
-	float getPressure() { BUMP(m_pressure, 0.1, 1013.0, 1012.0) }
+	float getPitch() { BUMP(m_pitch, 1.0, 10.0, -10.0) }
+	float getRoll() { BUMP(m_roll, 1.0, 10.0, -10.0) }
+	float getVelocityX() { BUMP(m_velocity_x, 0.0, 100.0, 10.0) }
+	float getVelocityY() { BUMP(m_velocity_y, 0.0, 100.0, 10.0) }
+	float getVelocityZ() { BUMP(m_velocity_z, 0.0, 100.0, 10.0) }
+	float getPressure() { BUMP(m_pressure, 0.0, 1013.0, 1012.0) }
 
 private:
 	// position
@@ -113,6 +126,9 @@ public:
 		try {
 			std::string token = j["id_token"];
 			m_headers = curl_slist_append(m_headers, ("Authorization: Bearer " + token).c_str());
+			m_headers = curl_slist_append(m_headers, "Accept: application/json");
+			m_headers = curl_slist_append(m_headers, "Content-Type: application/json");
+			m_headers = curl_slist_append(m_headers, "charsets: utf-8");
 		}
 		catch (...) {
 			return -1; // failed authentication!
@@ -138,16 +154,13 @@ public:
 
 	int create_flightplan(const float latitude, const float longitude, const std::string& pilotID, std::string& flightplanID) {
 		std::string url = m_url + "/flight/v2/plan";
-		m_headers = curl_slist_append(m_headers, "Accept: application/json");
-		m_headers = curl_slist_append(m_headers, "Content-Type: application/json");
-		m_headers = curl_slist_append(m_headers, "charsets: utf-8");
 
 		time_t current_time;
 		time(&current_time);
 		char now[21];
 		strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
-		time_t land_time = current_time + 60;
+		time_t land_time = current_time + 110;
 		char end[21];
 		strftime(end, 21, "%FT%TZ", gmtime(&land_time));
 
@@ -384,7 +397,7 @@ public:
 // Payload
 class Payload {
 public:
-	Payload(Simulator *sim) : m_sim(sim) {}
+	Payload(TelemetrySource *telemetry_source) : m_source(telemetry_source) {}
 	void build(Buffer& payload) {
 		payload.clear();
 		// message types
@@ -392,24 +405,24 @@ public:
 
 		// position
 		airmap::telemetry::Position position;
-		position.set_timestamp(m_sim->getTimeStamp());
-		position.set_latitude(m_sim->getLattitude());
-		position.set_longitude(m_sim->getLongtitude());
-		position.set_altitude_agl(m_sim->getAgl());
-		position.set_altitude_msl(m_sim->getMsl());
-		position.set_horizontal_accuracy(m_sim->getHorizAccuracy());
+		position.set_timestamp(m_source->getTimeStamp());
+		position.set_latitude(m_source->getLattitude());
+		position.set_longitude(m_source->getLongtitude());
+		position.set_altitude_agl(m_source->getAgl());
+		position.set_altitude_msl(m_source->getMsl());
+		position.set_horizontal_accuracy(m_source->getHorizAccuracy());
 		auto messagePosition = position.SerializeAsString();
-		std::cout << position.latitude() << ", " << position.longitude() << std::endl;
 		payload.add<std::uint16_t>(htons(static_cast<std::uint16_t>(Type::position)))
 				.add<std::uint16_t>(htons(messagePosition.size()))
 				.add(messagePosition);
 
+		/*
 		// speed
 		airmap::telemetry::Speed speed;
-		speed.set_timestamp(m_sim->getTimeStamp());
-		speed.set_velocity_x(m_sim->getVelocityX());
-		speed.set_velocity_y(m_sim->getVelocityY());
-		speed.set_velocity_z(m_sim->getVelocityZ());
+		speed.set_timestamp(m_source->getTimeStamp());
+		speed.set_velocity_x(m_source->getVelocityX());
+		speed.set_velocity_y(m_source->getVelocityY());
+		speed.set_velocity_z(m_source->getVelocityZ());
 		auto messageSpeed = speed.SerializeAsString();
 		payload.add<std::uint16_t>(htons(static_cast<std::uint16_t>(Type::speed)))
 				.add<std::uint16_t>(htons(messageSpeed.size()))
@@ -417,10 +430,10 @@ public:
 
 		// attitude
 		airmap::telemetry::Attitude attitude;
-		attitude.set_timestamp(m_sim->getTimeStamp());
-		attitude.set_yaw(m_sim->getYaw());
-		attitude.set_pitch(m_sim->getPitch());
-		attitude.set_roll(m_sim->getRoll());
+		attitude.set_timestamp(m_source->getTimeStamp());
+		attitude.set_yaw(m_source->getYaw());
+		attitude.set_pitch(m_source->getPitch());
+		attitude.set_roll(m_source->getRoll());
 		auto messageAttitude = attitude.SerializeAsString();
 		payload.add<std::uint16_t>(htons(static_cast<std::uint16_t>(Type::attitude)))
 				.add<std::uint16_t>(htons(messageAttitude.size()))
@@ -428,16 +441,17 @@ public:
 
 		// barometer
 		airmap::telemetry::Barometer barometer;
-		barometer.set_timestamp(m_sim->getTimeStamp());
-		barometer.set_pressure(m_sim->getPressure());
+		barometer.set_timestamp(m_source->getTimeStamp());
+		barometer.set_pressure(m_source->getPressure());
 		auto messageBarometer = barometer.SerializeAsString();
 		payload.add<std::uint16_t>(htons(static_cast<std::uint16_t>(Type::barometer)))
 				.add<std::uint16_t>(htons(messageBarometer.size()))
 				.add(messageBarometer);
+		*/
 	}
 
 private:
-	Simulator *m_sim;
+	TelemetrySource *m_source;
 };
 
 // main
@@ -480,6 +494,8 @@ int main(int argc, char* argv[])
 
 	std::cout << "FlightID: " << flightID << std::endl;
 
+	return 0;
+	usleep(15 * 1000000);
 	std::string key;
 	if (-1 == communicator.start(flightID, key)) {
 		std::cout << "Communication Failed!" << std::endl;

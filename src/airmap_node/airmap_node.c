@@ -243,7 +243,7 @@ int airmap_create_flightplan(airmap_node_t *node)
 	char now[21];
 	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
-	time_t land_time = current_time + 90;
+	time_t land_time = current_time + 150;
 	char end[21];
 	strftime(end, 21, "%FT%TZ", gmtime(&land_time));
 
