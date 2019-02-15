@@ -5,6 +5,8 @@ project(vutura_utm)
 find_package(nng CONFIG REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(cJSON REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
 
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/include/proto)
 
@@ -19,7 +21,13 @@ add_custom_command(
 )
 
 file(GLOB proto_c_files ${CMAKE_SOURCE_DIR}/include/proto/*.c)
-#message("${proto_c_files}")
+
+add_custom_command(
+    PRE_BUILD
+    COMMAND protoc --proto_path=${CMAKE_SOURCE_DIR}/proto --cpp_out=${CMAKE_SOURCE_DIR}/include/proto ${CMAKE_SOURCE_DIR}/proto/airmap_telemetry.proto
+    DEPENDS ${CMAKE_SOURCE_DIR}/proto/airmap_telemetry.proto
+    OUTPUT ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h
+)
 
 include_directories(include/mavlink/common)
 include_directories(include)
@@ -29,5 +37,9 @@ target_link_libraries(mavlink_node nng::nng protobuf-c)
 add_executable(utm_node src/utm_node/utm_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
 target_link_libraries(utm_node nng::nng protobuf-c)
 
+include_directories(include/proto)
 add_executable(airmap_node src/airmap_node/airmap_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
-target_link_libraries(airmap_node nng::nng protobuf-c curl cjson)
+target_link_libraries(airmap_node nng::nng protobuf-c curl cjson nlohmann_json::nlohmann_json protobuf)
+
+add_executable(airmap_telemetry src/airmap_node/airmap_telemetry.cpp  ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h)
+target_link_libraries(airmap_telemetry nlohmann_json::nlohmann_json protobuf cryptopp curl)

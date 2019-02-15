@@ -243,7 +243,7 @@ int airmap_create_flightplan(airmap_node_t *node)
 	char now[21];
 	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
-	time_t land_time = current_time + 3600;
+	time_t land_time = current_time + 90;
 	char end[21];
 	strftime(end, 21, "%FT%TZ", gmtime(&land_time));
 
@@ -254,10 +254,12 @@ int airmap_create_flightplan(airmap_node_t *node)
 	cJSON *end_time = NULL;
 	cJSON *buffer = NULL;
 	cJSON *max_altitude_agl = NULL;
+	cJSON *takeoff_latitude = NULL;
+	cJSON *takeoff_longitude = NULL;
 	cJSON *geometry = NULL;
 	cJSON *geometry_type = NULL;
 	cJSON *geometry_coordinates = NULL;
-	cJSON *geometry_coordinates_array = NULL;
+//	cJSON *geometry_coordinates_array = NULL;
 	cJSON *geometry_coordinates_1 = NULL;
 	cJSON *geometry_coordinates_2 = NULL;
 	cJSON *geometry_coordinates_3 = NULL;
@@ -276,46 +278,54 @@ int airmap_create_flightplan(airmap_node_t *node)
 	end_time = cJSON_CreateString(end);
 	cJSON_AddItemToObject(fp_data, "end_time", end_time);
 
-	buffer = cJSON_CreateNumber(60);
+	buffer = cJSON_CreateNumber(20);
 	cJSON_AddItemToObject(fp_data, "buffer", buffer);
 
 	max_altitude_agl = cJSON_CreateNumber(120);
 	cJSON_AddItemToObject(fp_data, "max_altitude_agl", max_altitude_agl);
 	geometry_coordinates = cJSON_CreateArray();
-	geometry_coordinates_array = cJSON_CreateArray();
+//	geometry_coordinates_array = cJSON_CreateArray();
 
 	double points[][2] = {{4.4171905517578125, 52.170365387094016},
 			      {4.418070316314697, 52.168865084603496},
 			      {4.421203136444092, 52.16958892106857},
-			      {4.420130252838135, 52.17099707827048}};
+			      {4, 52}};
+
+	takeoff_latitude = cJSON_CreateNumber(points[0][0]);
+	cJSON_AddItemToObject(fp_data, "takeoff_latitude", takeoff_latitude);
+
+	takeoff_longitude = cJSON_CreateNumber(points[0][1]);
+	cJSON_AddItemToObject(fp_data, "takeoff_longitude", takeoff_longitude);
 
 	geometry_coordinates_1 = cJSON_CreateDoubleArray(points[0], 2);
-	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_1);
+//	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_1);
 
-	geometry_coordinates_2 = cJSON_CreateDoubleArray(points[1], 2);
-	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_2);
+//	geometry_coordinates_2 = cJSON_CreateDoubleArray(points[1], 2);
+//	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_2);
 
-	geometry_coordinates_3 = cJSON_CreateDoubleArray(points[2], 2);
-	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_3);
+//	geometry_coordinates_3 = cJSON_CreateDoubleArray(points[2], 2);
+//	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_3);
 
-	geometry_coordinates_4 = cJSON_CreateDoubleArray(points[3], 2);
-	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_4);
+//	geometry_coordinates_4 = cJSON_CreateDoubleArray(points[3], 2);
+//	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_4);
 
-	geometry_coordinates_5 = cJSON_CreateDoubleArray(points[0], 2);
-	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_5);
+//	geometry_coordinates_5 = cJSON_CreateDoubleArray(points[0], 2);
+//	cJSON_AddItemToArray(geometry_coordinates_array, geometry_coordinates_5);
 
-	cJSON_AddItemToArray(geometry_coordinates, geometry_coordinates_array);
+//	cJSON_AddItemToArray(geometry_coordinates, geometry_coordinates_array);
 
 	geometry = cJSON_CreateObject();
 
-	geometry_type = cJSON_CreateString("Polygon");
+	geometry_type = cJSON_CreateString("Point");
 	cJSON_AddItemToObject(geometry, "type", geometry_type);
 
-	cJSON_AddItemToObject(geometry, "coordinates", geometry_coordinates);
+	cJSON_AddItemToObject(geometry, "coordinates", geometry_coordinates_1);
 
 	cJSON_AddItemToObject(fp_data, "geometry", geometry);
 
 	char *string = cJSON_Print(fp_data);
+
+	printf("json:\n%s\n", string);
 
 	cJSON_Delete(fp_data);
 
@@ -355,6 +365,8 @@ int airmap_create_flightplan(airmap_node_t *node)
 	}
 
 	curl_easy_cleanup(curl);
+
+	printf("response:\n%s\n", data.data);
 
 	// Parse the output to get flightplan id
 	cJSON *json = cJSON_Parse(data.data);
@@ -538,6 +550,7 @@ int airmap_submit_flightplan(airmap_node_t *node)
 
 	curl_easy_cleanup(curl);
 
+	printf("submit fp response:\n%s\n", data.data);
 
 	cJSON *json = cJSON_Parse(data.data);
 
