@@ -99,7 +99,7 @@ int main(int argc, char **argv)
 			//break;
 		}
 
-		if (fds[0].revents == POLLIN) {
+		if (fds[0].revents & POLLIN) {
 			nng_msg *fp_msg;
 			printf("Sending finished\n");
 			//nng_recvmsg(node.req_fp_sock, &fp_msg, NNG_FLAG_NONBLOCK);

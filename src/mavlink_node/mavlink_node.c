@@ -194,7 +194,7 @@ int main(int argc, char **argv)
 			//break;
 		}
 
-		if (fds[0].revents == POLLIN) {
+		if (fds[0].revents & POLLIN) {
 			memset(node.buf, 0, BUFFER_LENGTH);
 			ssize_t recv_size = recv(fds[0].fd, (void *)node.buf, BUFFER_LENGTH, 0);
 			if (recv_size > 0) {
@@ -209,7 +209,7 @@ int main(int argc, char **argv)
 			}
 		}
 
-		if (fds[1].revents == POLLIN) {
+		if (fds[1].revents & POLLIN) {
 			uint64_t num_timer_events;
 			ssize_t recv_size = read(fds[1].fd, &num_timer_events, 8);
 			(void) recv_size;
@@ -222,7 +222,7 @@ int main(int argc, char **argv)
 			should_exit = true;
 		}
 
-		if (fds[2].revents == POLLIN) {
+		if (fds[2].revents & POLLIN) {
 			nng_msg *fp_msg;
 			nng_recvmsg(node.rep_fp_socket, &fp_msg, NNG_FLAG_NONBLOCK);
 			mavlink_node_handle_request(&node, fp_msg);
