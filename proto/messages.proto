@@ -7,6 +7,10 @@ message GPSMessage {
   required int32 alt = 4;
 }
 
+message UavHeartbeat {
+  optional bool armed = 1;
+}
+
 enum MavCommands {
   START_MISSION = 1;
   PAUSE_MISSION = 2;

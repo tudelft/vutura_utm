@@ -10,6 +10,7 @@
 
 #include <nng/nng.h>
 #include <nng/protocol/reqrep0/rep.h>
+#include <nng/protocol/pubsub0/pub.h>
 
 #include "mavlink_node.h"
 #include <mavlink.h>
@@ -28,6 +29,10 @@ typedef struct mavlink_node_t
 	uint8_t buf[BUFFER_LENGTH];
 	nng_socket rep_fp_socket;
 	int rep_fp_fd;
+	nng_socket pub_gps_position_socket;
+//	int pub_gps_position_fd;
+	nng_socket pub_uav_heartbeat_socket;
+//	int pub_uav_heartbeat_fd;
 } mavlink_node_t;
 
 void mavlink_node_timer_event(mavlink_node_t *node);
@@ -38,7 +43,7 @@ void mavlink_node_timer_event(mavlink_node_t *node)
 {
 	// Probably want to emit a heartbeat now
 	mavlink_message_t msg;
-	mavlink_msg_heartbeat_pack(1, 200, &msg, MAV_TYPE_HELICOPTER, MAV_AUTOPILOT_GENERIC, MAV_MODE_GUIDED_ARMED, 0, MAV_STATE_ACTIVE);
+	mavlink_msg_heartbeat_pack(255, 200, &msg, MAV_TYPE_GCS, MAV_AUTOPILOT_GENERIC, MAV_MODE_GUIDED_ARMED, 0, MAV_STATE_ACTIVE);
 	uint16_t len = mavlink_msg_to_send_buffer(node->buf, &msg);
 	int bytes_sent = sendto(node->uav_sock, node->buf, len, 0, (struct sockaddr*)&node->uav_addr, sizeof(struct sockaddr_in));
 	//printf("[%s] sent heartbeat %d bytes\n", node->name, bytes_sent);
@@ -61,7 +66,30 @@ void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
 		len = gpsmessage__get_packed_size(&gps_message);
 		uint8_t buf[len];
 		gpsmessage__pack(&gps_message, buf);
+
+		nng_msg *msg;
+		nng_msg_alloc(&msg, 0);
+		nng_msg_append(msg, &buf, len);
+		nng_sendmsg(node->pub_gps_position_socket, msg, NNG_FLAG_NONBLOCK);
+
 		//printf("Writing %d serialized bytes\n", len);
+	} else if (msg->msgid == MAVLINK_MSG_ID_HEARTBEAT) {
+		printf("HB\n");
+		// check if vehicle is armed
+		mavlink_heartbeat_t hb;
+		mavlink_msg_heartbeat_decode(msg, &hb);
+		UavHeartbeat uavhb = UAV_HEARTBEAT__INIT;
+		uint16_t len;
+		uavhb.has_armed = true;
+		uavhb.armed = hb.system_status == MAV_STATE_ACTIVE;
+		len = uav_heartbeat__get_packed_size(&uavhb);
+		uint8_t buf[len];
+		uav_heartbeat__pack(&uavhb, buf);
+
+		nng_msg *msg;
+		nng_msg_alloc(&msg, 0);
+		nng_msg_append(msg, buf, len);
+		nng_sendmsg(node->pub_uav_heartbeat_socket, msg, 0);
 	}
 }
 
@@ -114,6 +142,7 @@ int main(int argc, char **argv)
 		.uav_sock = -1,
 		.timerfd = -1,
 		.rep_fp_fd = -1
+//		.pub_gps_position_fd = -1
 	};
 
 	int rv;
@@ -165,8 +194,26 @@ int main(int argc, char **argv)
 		fatal("nng_listen", rv);
 	}
 
-	if ((rv = nng_getopt_int(node.rep_fp_socket, NNG_OPT_RECVFD, &node.rep_fp_fd))) {
+	if ((rv = nng_getopt_int(node.rep_fp_socket, NNG_OPT_RECVFD, &node.rep_fp_fd)) != 0) {
 		fatal("nng_getopt", rv);
+	}
+
+	// GPS position publishing
+	if ((rv = nng_pub0_open(&node.pub_gps_position_socket)) != 0) {
+		fatal("nng_pub0_open", rv);
+	}
+
+	if ((rv = nng_listen(node.pub_gps_position_socket, "ipc:///tmp/gps_position.sock", NULL, NNG_FLAG_NONBLOCK)) != 0) {
+		fatal("nng_listen", rv);
+	}
+
+	// UAV Armed status
+	if ((rv = nng_pub0_open(&node.pub_uav_heartbeat_socket)) != 0) {
+		fatal("nng_pub0_open", rv);
+	}
+
+	if ((rv = nng_listen(node.pub_uav_heartbeat_socket, "ipc:///tmp/uav_armed.sock", NULL, NNG_FLAG_NONBLOCK)) != 0) {
+		fatal("nng_listen", rv);
 	}
 
 	// Configure file descriptors for event listening
@@ -219,7 +266,7 @@ int main(int argc, char **argv)
 			//printf("call mavlink_node_timer_event\n");
 			mavlink_node_timer_event(&node);
 			//printf("finished call\n\n");
-			should_exit = true;
+			//should_exit = true;
 		}
 
 		if (fds[2].revents & POLLIN) {
@@ -230,7 +277,7 @@ int main(int argc, char **argv)
 				printf("NOT NULL");
 				//free(fp_msg);
 			}
-			should_exit = true;
+			//should_exit = true;
 		}
 	}
 
