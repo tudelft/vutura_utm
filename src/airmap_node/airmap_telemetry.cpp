@@ -22,8 +22,10 @@
 #include <nng/nng.h>
 #include <nng/protocol/reqrep0/req.h>
 #include <nng/protocol/reqrep0/rep.h>
+#include <nng/protocol/pubsub0/sub.h>
 
 #include "airmap_config.h"
+#include "messages.pb.h"
 
 // command to build with g++
 // g++ -std=c++1y -o "telemetry" telemetry.pb.cc telemetry.cpp -lcurl -lcryptopp -lprotobuf
@@ -541,6 +543,17 @@ void handle_request(AirmapNode* node, nng_msg *msg)
 	node->request_flight();
 }
 
+void handle_position_update(AirmapNode* node, nng_msg *msg)
+{
+	// unpack msg
+	GPSMessage gps_msg;
+	gps_msg.ParseFromArray(nng_msg_body(msg), nng_msg_len(msg));
+	if (gps_msg.has_lat() && gps_msg.has_lon()) {
+		node->set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7);
+		std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
+	}
+}
+
 void fatal(const char *func, int rv)
 {
 	fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
@@ -554,15 +567,19 @@ int main(int argc, char* argv[])
 	// authenticate etc
 	node.start();
 
-	const float latitude = 52.170365387094016;
+	//const float latitude = 52.170365387094016;
 	// longitude
-	const float longitude = 4.4171905517578125;
+	//const float longitude = 4.4171905517578125;
 
-	node.set_position(latitude, longitude);
+	//node.set_position(latitude, longitude);
 
 	// Listen for nng messages in an event loop
 	nng_socket utmsp_sock;
 	int utmsp_fd = -1;
+
+	nng_socket gps_position_sock;
+	int gps_position_fd = -1;
+
 	int rv;
 
 	// Configure reply topic for utmsp request
@@ -578,12 +595,33 @@ int main(int argc, char* argv[])
 		fatal("nng_getopt", rv);
 	}
 
+	// Listen to position data
+	if ((rv = nng_sub0_open(&gps_position_sock)) != 0) {
+		fatal("nng_sub0_open", rv);
+	}
+
+	if ((rv = nng_setopt(gps_position_sock, NNG_OPT_SUB_SUBSCRIBE, "", 0)) != 0) {
+		fatal("nng_setopt", rv);
+	}
+
+	if ((rv = nng_dial(gps_position_sock, "ipc:///tmp/gps_position.sock", NULL, NNG_FLAG_NONBLOCK))) {
+		fatal("nng_listen", rv);
+	}
+
+	if ((rv = nng_getopt_int(gps_position_sock, NNG_OPT_RECVFD, &gps_position_fd))) {
+		fatal("nng_getopt", rv);
+	}
+
 	// Configure file descriptors for event listening
-	const unsigned int num_fds = 1;
+	const unsigned int num_fds = 2;
 	struct pollfd fds[num_fds];
 	fds[0].fd = utmsp_fd;
 	fds[0].events = POLLIN;
 	fds[0].revents = 0;
+
+	fds[1].fd = gps_position_fd;
+	fds[1].events = POLLIN;
+	fds[1].revents = 0;
 
 	bool should_exit = false;
 	while (!should_exit) {
@@ -603,6 +641,15 @@ int main(int argc, char* argv[])
 			memcpy((char*)nng_msg_body(msg), reply, strlen(reply));
 			nng_sendmsg(utmsp_sock, msg, 0);
 		}
+
+		if (fds[1].revents & POLLIN) {
+			// got position update
+			std::cout << "Got position" << std::endl;
+			nng_msg *msg;
+			nng_recvmsg(gps_position_sock, &msg, 0);
+			handle_position_update(&node, msg);
+			nng_msg_free(msg);
+		}
 	}
 
 
@@ -618,9 +665,9 @@ int main(int argc, char* argv[])
 	// API Key
 	const std::string apiKey = AIRMAP_API_KEY;
 	// latitude
-//	const float latitude = 52.170365387094016;
+	const float latitude = 52.170365387094016;
 	// longitude
-//	const float longitude = 4.4171905517578125;
+	const float longitude = 4.4171905517578125;
 	// aes-256-cbc
 	const uint8_t encryptionType = 1;
 

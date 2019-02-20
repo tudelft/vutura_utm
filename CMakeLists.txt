@@ -24,9 +24,9 @@ file(GLOB proto_c_files ${CMAKE_SOURCE_DIR}/include/proto/*.c)
 
 add_custom_command(
     PRE_BUILD
-    COMMAND protoc --proto_path=${CMAKE_SOURCE_DIR}/proto --cpp_out=${CMAKE_SOURCE_DIR}/include/proto ${CMAKE_SOURCE_DIR}/proto/airmap_telemetry.proto
+    COMMAND protoc --proto_path=${CMAKE_SOURCE_DIR}/proto --cpp_out=${CMAKE_SOURCE_DIR}/include/proto ${CMAKE_SOURCE_DIR}/proto/airmap_telemetry.proto ${CMAKE_SOURCE_DIR}/proto/messages.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/proto/airmap_telemetry.proto
-    OUTPUT ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h
+    OUTPUT ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h ${CMAKE_SOURCE_DIR}/include/proto/messages.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/messages.pb.h
 )
 
 include_directories(include/mavlink/common)
@@ -41,5 +41,5 @@ include_directories(include/proto)
 add_executable(airmap_node src/airmap_node/airmap_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
 target_link_libraries(airmap_node nng::nng protobuf-c curl cjson nlohmann_json::nlohmann_json protobuf)
 
-add_executable(airmap_telemetry src/airmap_node/airmap_telemetry.cpp  ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h)
+add_executable(airmap_telemetry src/airmap_node/airmap_telemetry.cpp  ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h ${CMAKE_SOURCE_DIR}/include/proto/messages.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/messages.pb.h)
 target_link_libraries(airmap_telemetry nlohmann_json::nlohmann_json protobuf cryptopp curl nng::nng)

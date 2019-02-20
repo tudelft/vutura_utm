@@ -56,7 +56,7 @@ void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
 	if (msg->msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
 		mavlink_global_position_int_t global_pos;
 		mavlink_msg_global_position_int_decode(msg, &global_pos);
-		//printf("[%s] got global position lat: %f lon: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7);
+		printf("[%s] got global position lat: %f lon: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7);
 		GPSMessage gps_message = GPSMESSAGE__INIT;
 		uint16_t len;
 		gps_message.timestamp = 0;
@@ -70,7 +70,7 @@ void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
 		nng_msg *msg;
 		nng_msg_alloc(&msg, 0);
 		nng_msg_append(msg, &buf, len);
-		nng_sendmsg(node->pub_gps_position_socket, msg, NNG_FLAG_NONBLOCK);
+		nng_sendmsg(node->pub_gps_position_socket, msg, 0);
 
 		//printf("Writing %d serialized bytes\n", len);
 	} else if (msg->msgid == MAVLINK_MSG_ID_HEARTBEAT) {
