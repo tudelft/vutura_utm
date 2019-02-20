@@ -168,7 +168,7 @@ public:
 		char now[21];
 		strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
-		time_t land_time = current_time + 110;
+		time_t land_time = current_time + 600;
 		char end[21];
 		strftime(end, 21, "%FT%TZ", gmtime(&land_time));
 
@@ -466,12 +466,15 @@ class AirmapNode {
 public:
 	AirmapNode() :
 		_communicator(AIRMAP_API_KEY),
+		_udp("telemetry.airmap.com", 16060),
 		_encryptionType(1),
-
+		_comms_counter(1),
+		_iv(16, 0),
 		_has_position_data(false),
 		_lat(0),
 		_lon(0)
 	{
+
 	}
 
 	int start() {
@@ -498,28 +501,128 @@ public:
 		}
 
 		std::cout << "FlightplanID: " << _flightplanID << std::endl;
+	}
 
-		std::string _flightID;
+	int start_flight() {
+		if (_flightplanID.size() == 0) {
+			std::cout << "_flightID empty" << std::endl;
+			return -1;
+		}
+
 		if (-1 == _communicator.submit_flight(_flightplanID, _flightID)) {
 			std::cout << "Flight Submission Failed!" << std::endl;
 			return -1;
 		}
 
 		std::cout << "FlightID: " << _flightID << std::endl;
-	}
 
-	int start_flight() {
+		if (-1 == _communicator.start(_flightID, _commsKey)) {
+			std::cout << "Communication Failed!" << std::endl;
+			return -1;
+		}
+
+		std::cout << "telemetry comms key: " << _commsKey << std::endl;
+
+		if (-1 == _udp.connect()) {
+			std::cout << "Failed to connect!" << std::endl;
+			return -1;
+		}
+
+		// serial number
+		_comms_counter = 1;
+
+		/*
+		// send 100 packets @ 5 Hz
+		for (int i = 0; i < 5*60; ++i) {
+			// build payload
+			payloadBuilder.build(payload);
+
+			// encrypt payload
+			crypto.encrypt(key, payload, cipher, iv);
+
+			// build UDP packet
+			Buffer packet;
+			packet.add<std::uint32_t>(htonl(counter++))
+					.add<std::uint8_t>(flightID.size())
+					.add(flightID)
+					.add<std::uint8_t>(encryptionType)
+					.add(iv)
+					.add(cipher);
+			std::string data = packet.get();
+			int length = static_cast<int>(data.size());
+
+			// send packet
+			if (udp.sendmsg(data.c_str(), length) == length)
+				std::cout << "Telemetry packet sent successfully!" << std::endl;
+
+			usleep(200000); // 5 Hz
+		}
+		*/
+
 
 	}
 
 	int end_flight() {
-
+		// end communication and flight
+		_communicator.end(_flightID);
+		_communicator.end_flight(_flightID);
+		_commsKey = "";
+		_flightID = "";
+		_flightplanID = "";
 	}
 
 	int set_position(float latitude, float longitude) {
 		_lat = latitude;
 		_lon = longitude;
 		_has_position_data = true;
+
+		// If we have a comms key, send telemetry
+		if (_commsKey.length() == 0) {
+			return 0;
+		}
+
+		enum class Type : std::uint8_t { position = 1, speed = 2, attitude = 3, barometer = 4 };
+
+		_payload.clear();
+		// position
+		airmap::telemetry::Position position;
+		position.set_timestamp(getTimeStamp());
+		position.set_latitude(_lat);
+		position.set_longitude(_lon);
+		position.set_altitude_agl(50);
+		position.set_altitude_msl(50);
+		position.set_horizontal_accuracy(10);
+		auto messagePosition = position.SerializeAsString();
+		_payload.add<std::uint16_t>(htons(static_cast<std::uint16_t>(Type::position)))
+				.add<std::uint16_t>(htons(messagePosition.size()))
+				.add(messagePosition);
+
+		// encrypt payload
+		_crypto.encrypt(_commsKey, _payload, _cipher, _iv);
+
+		// build UDP packet
+		Buffer packet;
+		packet.add<std::uint32_t>(htonl(_comms_counter++))
+				.add<std::uint8_t>(_flightID.size())
+				.add(_flightID)
+				.add<std::uint8_t>(_encryptionType)
+				.add(_iv)
+				.add(_cipher);
+		std::string data = packet.get();
+		int length = static_cast<int>(data.size());
+
+		// send packet
+		if (_udp.sendmsg(data.c_str(), length) == length) {
+			std::cout << "Telemetry packet sent successfully!" << std::endl;
+		}
+
+
+	}
+
+	std::uint64_t getTimeStamp() {
+		struct timeval tp;
+		gettimeofday(&tp, NULL);
+		return static_cast<std::uint64_t>(tp.tv_sec) * 1000L + tp.tv_usec / 1000;
 	}
 
 
@@ -528,10 +631,18 @@ private:
 	bool has_position_data() { return _has_position_data; }
 
 	Communicator _communicator;
+	UdpSender _udp;
+	Encryptor _crypto;
+	std::string _cipher;
+	std::vector<std::uint8_t> _iv;
+	Buffer _payload;
+
 	const uint8_t _encryptionType;
 	std::string _pilotID;
 	std::string _flightplanID;
 	std::string _flightID;
+	std::string _commsKey;
+	uint32_t _comms_counter;
 
 	bool _has_position_data;
 	double _lat;
@@ -540,7 +651,16 @@ private:
 
 void handle_request(AirmapNode* node, nng_msg *msg)
 {
-	node->request_flight();
+	std::string request((char*)nng_msg_body(msg), (char*)nng_msg_body(msg) + nng_msg_len(msg));
+	if (request == "request_flight") {
+		node->request_flight();
+
+	} else if (request == "start_flight") {
+		node->start_flight();
+
+	} else if (request == "end_flight") {
+		node->end_flight();
+	}
 }
 
 void handle_position_update(AirmapNode* node, nng_msg *msg)
@@ -550,7 +670,7 @@ void handle_position_update(AirmapNode* node, nng_msg *msg)
 	gps_msg.ParseFromArray(nng_msg_body(msg), nng_msg_len(msg));
 	if (gps_msg.has_lat() && gps_msg.has_lon()) {
 		node->set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7);
-		std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
+		//std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
 	}
 }
 
@@ -632,7 +752,7 @@ int main(int argc, char* argv[])
 		}
 
 		if (fds[0].revents & POLLIN) {
-			const char* reply = "Hallo!";
+			const char* reply = "OK";
 			nng_msg *msg;
 			nng_recvmsg(utmsp_sock, &msg, 0);
 			std::cout << (char*)nng_msg_body(msg) << " " << strlen(reply) << std::endl;
@@ -644,7 +764,7 @@ int main(int argc, char* argv[])
 
 		if (fds[1].revents & POLLIN) {
 			// got position update
-			std::cout << "Got position" << std::endl;
+			//std::cout << "Got position" << std::endl;
 			nng_msg *msg;
 			nng_recvmsg(gps_position_sock, &msg, 0);
 			handle_position_update(&node, msg);
@@ -724,7 +844,8 @@ int main(int argc, char* argv[])
 	// serial number
 	static std::uint32_t counter = 1;
 
-	// prepare builder
+	// prepare builder	Communicator communicator(apiKey);
+
 	Simulator sim;
 	Payload payloadBuilder(&sim);
 	Buffer payload;

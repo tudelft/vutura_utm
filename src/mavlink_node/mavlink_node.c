@@ -172,7 +172,7 @@ int main(int argc, char **argv)
 	memset(&node.uav_addr, 0, sizeof(node.uav_addr));
 	node.uav_addr.sin_family = AF_INET;
 	node.uav_addr.sin_addr.s_addr = inet_addr(target_ip);
-	node.uav_addr.sin_port = htons(14556);
+	node.uav_addr.sin_port = htons(14557);
 
 	// Configure periodic timer for heartbeats
 	node.timerfd = timerfd_create(CLOCK_MONOTONIC, 0);

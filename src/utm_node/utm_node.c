@@ -14,13 +14,18 @@
 typedef struct utm_node_t
 {
 	const char* name;
+	nng_socket req_utmsp_sock;
 	nng_socket req_fp_sock;
 	int req_fp_fd;
 	nng_socket sub_uav_armed_socket;
 	int sub_uav_armed_fd;
+	bool was_armed;
 } utm_node_t;
 
 void utm_node_handle_uav_armed(utm_node_t *node, nng_msg *msg);
+void utm_node_request_flight(utm_node_t *node);
+void utm_node_start_flight(utm_node_t *node);
+void utm_node_end_flight(utm_node_t *node);
 
 void utm_node_handle_uav_armed(utm_node_t *node, nng_msg *msg)
 {
@@ -33,8 +38,66 @@ void utm_node_handle_uav_armed(utm_node_t *node, nng_msg *msg)
 	}
 
 	if (uavhb_msg->has_armed) {
-		printf("Armed: %s\n", uavhb_msg->armed ? "yes" : "no");
+		if (node->was_armed != uavhb_msg->armed) {
+			if (uavhb_msg->armed) {
+				printf("ARMED\n");
+				utm_node_request_flight(node);
+				utm_node_start_flight(node);
+			} else {
+				printf("DISARMED\n");
+				utm_node_end_flight(node);
+			}
+			node->was_armed = uavhb_msg->armed;
+		}
 	}
+}
+
+void utm_node_request_flight(utm_node_t *node)
+{
+	nng_msg *msg;
+	const char *cmd = "request_flight";
+	nng_msg_alloc(&msg, 0);
+	nng_msg_append(msg, cmd, strlen(cmd));
+	nng_sendmsg(node->req_utmsp_sock, msg, 0);
+
+	// get reply
+	nng_recvmsg(node->req_utmsp_sock, &msg, 0);
+	uint16_t len = nng_msg_len(msg);
+	char buf[50] = {0};
+	memcpy(buf, nng_msg_body(msg), len);
+	printf("%s\n", buf);
+}
+
+void utm_node_start_flight(utm_node_t *node)
+{
+	nng_msg *msg;
+	const char *cmd = "start_flight";
+	nng_msg_alloc(&msg, 0);
+	nng_msg_append(msg, cmd, strlen(cmd));
+	nng_sendmsg(node->req_utmsp_sock, msg, 0);
+
+	// get reply
+	nng_recvmsg(node->req_utmsp_sock, &msg, 0);
+	uint16_t len = nng_msg_len(msg);
+	char buf[50] = {0};
+	memcpy(buf, nng_msg_body(msg), len);
+	printf("%s\n", buf);
+}
+
+void utm_node_end_flight(utm_node_t *node)
+{
+	nng_msg *msg;
+	const char *cmd = "end_flight";
+	nng_msg_alloc(&msg, 0);
+	nng_msg_append(msg, cmd, strlen(cmd));
+	nng_sendmsg(node->req_utmsp_sock, msg, 0);
+
+	// get reply
+	nng_recvmsg(node->req_utmsp_sock, &msg, 0);
+	uint16_t len = nng_msg_len(msg);
+	char buf[50] = {0};
+	memcpy(buf, nng_msg_body(msg), len);
+	printf("%s\n", buf);
 }
 
 void
@@ -50,10 +113,20 @@ int main(int argc, char **argv)
 		.name = "utm",
 		.req_fp_sock = -1,
 		.req_fp_fd = -1,
-		.sub_uav_armed_fd = -1
+		.sub_uav_armed_fd = -1,
+		.was_armed = false
 	};
 
 	int rv;
+
+	// Open socket for utmsp comms
+	if ((rv = nng_req0_open(&node.req_utmsp_sock)) != 0) {
+		fatal("nng_req0_open", rv);
+	}
+
+	if ((rv = nng_dial(node.req_utmsp_sock, "ipc:///tmp/utmsp.sock", NULL, NNG_FLAG_NONBLOCK))) {
+		fatal("nng_dial", rv);
+	}
 
 	/*
 	// Configure reply topic for flightplan request
@@ -87,6 +160,9 @@ int main(int argc, char **argv)
 	}
 
 	printf("receivefd: %d\n", node.sub_uav_armed_fd);
+
+//	utm_node_request_flight(&node);
+//	utm_node_start_flight(&node);
 
 	// Configure file descriptors for event listening
 	const unsigned int num_fds = 1;
