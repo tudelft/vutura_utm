@@ -168,7 +168,7 @@ public:
 		char now[21];
 		strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
-		time_t land_time = current_time + 300;
+		time_t land_time = current_time + 30 * 60;
 		char end[21];
 		strftime(end, 21, "%FT%TZ", gmtime(&land_time));
 
@@ -183,7 +183,7 @@ public:
 			{"geometry", {
 				 {"type", "Point"},
 				 {"coordinates", {
-					  latitude, longitude
+					  longitude, latitude
 				  }}
 			 }}
 		};
@@ -252,7 +252,7 @@ public:
 		curl_post(url.c_str(), m_headers, "", res);
 	}
 
-	void end_all_active_flights(std::string pilotID) {
+	int end_all_active_flights(std::string pilotID) {
 		// must have a pilot id for this
 
 		time_t current_time;
@@ -269,12 +269,19 @@ public:
 		// parse the results with json interpreter
 		std::cout << res << std::endl;
 		auto j = nlohmann::json::parse(res);
-		auto active_flights = j["data"]["results"];
-		for (int i = 0; i < active_flights.size(); i++) {
-			std::cout << "Active flight_id: " << active_flights[i]["id"] << std::endl;
-			end_flight(active_flights[i]["id"]);
-			std::cout << "Ended" << std::endl;
+		try {
+			auto active_flights = j["data"]["results"];
+			for (int i = 0; i < active_flights.size(); i++) {
+				std::cout << "Active flight_id: " << active_flights[i]["id"] << std::endl;
+				end_flight(active_flights[i]["id"]);
+				std::cout << "Ended" << std::endl;
+			}
 		}
+		catch (...) {
+			return -1;
+		}
+
+		return 0;
 	}
 
 private:
@@ -497,7 +504,9 @@ public:
 		_iv(16, 0),
 		_has_position_data(false),
 		_lat(0),
-		_lon(0)
+		_lon(0),
+		_alt_msl(0),
+		_alt_agl(0)
 	{
 
 	}
@@ -599,7 +608,7 @@ public:
 		_flightplanID = "";
 	}
 
-	int set_position(float latitude, float longitude) {
+	int set_position(float latitude, float longitude, float alt_msl, float alt_agl) {
 		_lat = latitude;
 		_lon = longitude;
 		_has_position_data = true;
@@ -675,6 +684,8 @@ private:
 	bool _has_position_data;
 	double _lat;
 	double _lon;
+	double _alt_msl;
+	double _alt_agl;
 };
 
 void handle_request(AirmapNode* node, nng_msg *msg)
@@ -697,7 +708,7 @@ void handle_position_update(AirmapNode* node, nng_msg *msg)
 	GPSMessage gps_msg;
 	gps_msg.ParseFromArray(nng_msg_body(msg), nng_msg_len(msg));
 	if (gps_msg.has_lat() && gps_msg.has_lon()) {
-		node->set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7);
+		node->set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7, gps_msg.alt_msl() * 1e-3, gps_msg.alt_agl() * 1e-3);
 		//std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
 	}
 }
@@ -714,6 +725,7 @@ int main(int argc, char* argv[])
 	AirmapNode node;
 	// authenticate etc
 	node.start();
+//	node.set_position(52.170365387094016, 4.4171905517578125);
 
 	// Listen for nng messages in an event loop
 	nng_socket utmsp_sock;

@@ -4,7 +4,8 @@ message GPSMessage {
   required uint64 timestamp = 1;
   required sint32 lat = 2;
   required sint32 lon = 3;
-  required int32 alt = 4;
+  required sint32 alt_msl = 4;
+  required sint32 alt_agl = 5;
 }
 
 message UavHeartbeat {

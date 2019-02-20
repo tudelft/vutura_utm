@@ -56,13 +56,14 @@ void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
 	if (msg->msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
 		mavlink_global_position_int_t global_pos;
 		mavlink_msg_global_position_int_decode(msg, &global_pos);
-		printf("[%s] got global position lat: %f lon: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7);
+		printf("[%s] got global position lat: %f lon: %f alt_msl: %f alt_agl: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7, global_pos.alt * 1e-3, global_pos.relative_alt * 1e-3);
 		GPSMessage gps_message = GPSMESSAGE__INIT;
 		uint16_t len;
 		gps_message.timestamp = 0;
 		gps_message.lat = global_pos.lat;
 		gps_message.lon = global_pos.lon;
-		gps_message.alt = global_pos.alt;
+		gps_message.alt_msl = global_pos.alt;
+		gps_message.alt_agl = global_pos.relative_alt;
 		len = gpsmessage__get_packed_size(&gps_message);
 		uint8_t buf[len];
 		gpsmessage__pack(&gps_message, buf);
