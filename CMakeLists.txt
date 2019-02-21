@@ -1,12 +1,13 @@
 cmake_minimum_required(VERSION 3.1)
 project(vutura_utm)
 
+set(CMAKE_PREFIX_PATH /usr/lib)
+
 # Require nng for messaging between nodes
 find_package(nng CONFIG REQUIRED)
 find_package(Protobuf REQUIRED)
 #find_package(cJSON REQUIRED)
 find_package(nlohmann_json REQUIRED)
-
 
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/include/proto)
 
