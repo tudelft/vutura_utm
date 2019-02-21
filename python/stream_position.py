@@ -8,8 +8,8 @@ s1.bind('ipc:///tmp/gps_position.sock'.encode('utf-8'))
 
 gps_message = messages_pb2.GPSMessage()
 gps_message.timestamp = 0
-gps_message.lat = 521234157
-gps_message.lon = 41122334
+gps_message.lat = 520000000
+gps_message.lon = 40000000
 gps_message.alt_msl = 10
 gps_message.alt_agl = 10
 

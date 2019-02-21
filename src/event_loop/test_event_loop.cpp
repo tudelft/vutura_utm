@@ -4,13 +4,13 @@
 #include <signal.h>
 #include "event_loop.hpp"
 
-void timer_callback(int fd)
+void timer_callback(EventSource* es)
 {
 	uint64_t num_timer_events;
-	ssize_t recv_size = read(fd, &num_timer_events, 8);
+	ssize_t recv_size = read(es->_fd, &num_timer_events, 8);
 	(void) recv_size;
 
-	std::cout << "timer event " << fd << std::endl;
+	std::cout << "timer event " << es->_fd << std::endl;
 }
 
 EventLoop loop;

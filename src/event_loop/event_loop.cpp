@@ -1,3 +1,4 @@
+#include <sys/stat.h>
 #include "event_loop.hpp"
 
 EventLoop::EventLoop() :
@@ -35,7 +36,7 @@ void EventLoop::start()
 		// check which event it was, and trigger the callback
 		for (ssize_t i = 0; i < len; i++) {
 			if (fds[i].revents & POLLIN) {
-				_event_sources[i]->callback(fds[i].fd);
+				_event_sources.at(i)->_callback(_event_sources.at(i));
 				continue;
 			}
 		}
@@ -47,4 +48,33 @@ void EventLoop::start()
 void EventLoop::stop()
 {
 	_should_exit = true;
+}
+
+Subscription::Subscription(std::string url, void(*cb)(EventSource*)) :
+	EventSource(cb),
+	_url(url)
+{
+	int rv;
+	// Listen to position data
+	if ((rv = nng_sub0_open(&_socket)) != 0) {
+		fatal("nng_sub0_open", rv);
+	}
+
+	if ((rv = nng_setopt(_socket, NNG_OPT_SUB_SUBSCRIBE, "", 0)) != 0) {
+		fatal("nng_setopt", rv);
+	}
+
+	if ((rv = nng_dial(_socket, _url.c_str(), NULL, NNG_FLAG_NONBLOCK))) {
+		fatal("nng_listen", rv);
+	}
+
+	if ((rv = nng_getopt_int(_socket, NNG_OPT_RECVFD, &_fd))) {
+		fatal("nng_getopt", rv);
+	}
+}
+
+void Subscription::fatal(const char *func, int rv)
+{
+	fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
+	exit(1);
 }

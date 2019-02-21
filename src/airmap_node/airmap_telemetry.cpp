@@ -26,6 +26,7 @@
 
 #include "airmap_config.h"
 #include "messages.pb.h"
+#include "event_loop.hpp"
 
 // command to build with g++
 // g++ -std=c++1y -o "telemetry" telemetry.pb.cc telemetry.cpp -lcurl -lcryptopp -lprotobuf
@@ -688,6 +689,31 @@ private:
 	double _alt_agl;
 };
 
+void handle_utmsp_update(EventSource* es)
+{
+	nng_socket *sock = static_cast<nng_socket*>(es->_source_object);
+	AirmapNode *node = static_cast<AirmapNode*>(es->_target_object);
+	const char* reply = "OK";
+	nng_msg *msg;
+	nng_recvmsg(*sock, &msg, 0);
+	std::cout << (char*)nng_msg_body(msg) << " " << strlen(reply) << std::endl;
+
+	std::string request((char*)nng_msg_body(msg), (char*)nng_msg_body(msg) + nng_msg_len(msg));
+	if (request == "request_flight") {
+		node->request_flight();
+
+	} else if (request == "start_flight") {
+		node->start_flight();
+
+	} else if (request == "end_flight") {
+		node->end_flight();
+	}
+
+	nng_msg_realloc(msg, strlen(reply));
+	memcpy((char*)nng_msg_body(msg), reply, strlen(reply));
+	nng_sendmsg(*sock, msg, 0);
+}
+
 void handle_request(AirmapNode* node, nng_msg *msg)
 {
 	std::string request((char*)nng_msg_body(msg), (char*)nng_msg_body(msg) + nng_msg_len(msg));
@@ -702,15 +728,24 @@ void handle_request(AirmapNode* node, nng_msg *msg)
 	}
 }
 
-void handle_position_update(AirmapNode* node, nng_msg *msg)
+void handle_position_update(EventSource* es)
 {
+	AirmapNode *node = static_cast<AirmapNode*>(es->_target_object);
+	Subscription *sub = static_cast<Subscription*>(es);
+	nng_socket *sock = &sub->_socket;
+
+	nng_msg *msg;
+	nng_recvmsg(*sock, &msg, 0);
+
 	// unpack msg
 	GPSMessage gps_msg;
 	gps_msg.ParseFromArray(nng_msg_body(msg), nng_msg_len(msg));
 	if (gps_msg.has_lat() && gps_msg.has_lon()) {
 		node->set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7, gps_msg.alt_msl() * 1e-3, gps_msg.alt_agl() * 1e-3);
-		//std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
+		std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
 	}
+	nng_msg_free(msg);
+
 }
 
 void fatal(const char *func, int rv)
@@ -749,61 +784,17 @@ int main(int argc, char* argv[])
 		fatal("nng_getopt", rv);
 	}
 
-	// Listen to position data
-	if ((rv = nng_sub0_open(&gps_position_sock)) != 0) {
-		fatal("nng_sub0_open", rv);
-	}
+	EventSource utmsp(utmsp_fd, handle_utmsp_update);
+	utmsp.set_source_object(&utmsp_sock);
+	utmsp.set_target_object(&node);
 
-	if ((rv = nng_setopt(gps_position_sock, NNG_OPT_SUB_SUBSCRIBE, "", 0)) != 0) {
-		fatal("nng_setopt", rv);
-	}
+	Subscription gps_position("ipc:///tmp/gps_position.sock", handle_position_update);
+	gps_position.set_target_object(&node);
 
-	if ((rv = nng_dial(gps_position_sock, "ipc:///tmp/gps_position.sock", NULL, NNG_FLAG_NONBLOCK))) {
-		fatal("nng_listen", rv);
-	}
-
-	if ((rv = nng_getopt_int(gps_position_sock, NNG_OPT_RECVFD, &gps_position_fd))) {
-		fatal("nng_getopt", rv);
-	}
-
-	// Configure file descriptors for event listening
-	const unsigned int num_fds = 2;
-	struct pollfd fds[num_fds];
-	fds[0].fd = utmsp_fd;
-	fds[0].events = POLLIN;
-	fds[0].revents = 0;
-
-	fds[1].fd = gps_position_fd;
-	fds[1].events = POLLIN;
-	fds[1].revents = 0;
-
-	bool should_exit = false;
-	while (!should_exit) {
-		int rv = poll(fds, num_fds, 3000);
-		if (rv == 0) {
-			std::cout << "Timeout..." << std::endl;
-			continue;
-		}
-
-		if (fds[0].revents & POLLIN) {
-			const char* reply = "OK";
-			nng_msg *msg;
-			nng_recvmsg(utmsp_sock, &msg, 0);
-			std::cout << (char*)nng_msg_body(msg) << " " << strlen(reply) << std::endl;
-			handle_request(&node, msg);
-			nng_msg_realloc(msg, strlen(reply));
-			memcpy((char*)nng_msg_body(msg), reply, strlen(reply));
-			nng_sendmsg(utmsp_sock, msg, 0);
-		}
-
-		if (fds[1].revents & POLLIN) {
-			// position update
-			nng_msg *msg;
-			nng_recvmsg(gps_position_sock, &msg, 0);
-			handle_position_update(&node, msg);
-			nng_msg_free(msg);
-		}
-	}
+	EventLoop loop;
+	loop.add(utmsp);
+	loop.add(gps_position);
+	loop.start();
 
 	return 0;
 }
