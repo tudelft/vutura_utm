@@ -6,3 +6,8 @@ include/proto/*
 # QtCreator IDE
 CMakeLists.txt.user
 .CMakeLists.txt.swp
+
+# Python stuff
+__pycache__
+*.swp
+
