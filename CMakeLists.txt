@@ -30,16 +30,29 @@ add_custom_command(
 )
 
 include_directories(include/mavlink/common)
+include_directories(include/proto)
 include_directories(include)
+
 add_executable(mavlink_node src/mavlink_node/mavlink_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
 target_link_libraries(mavlink_node nng::nng protobuf-c)
 
-add_executable(utm_node src/utm_node/utm_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
-target_link_libraries(utm_node nng::nng protobuf-c)
+add_library(vutura_common
+    src/event_loop.cpp
+    src/event_loop.hpp)
 
-include_directories(include/proto)
-add_executable(airmap_node src/airmap_node/airmap_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
-target_link_libraries(airmap_node nng::nng protobuf-c curl cjson nlohmann_json::nlohmann_json protobuf)
+add_executable(test_event_loop
+    src/test_event_loop.cpp)
+target_link_libraries(test_event_loop vutura_common)
+
+add_executable(utm_node
+    src/utm_node/utm_node.c
+    ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c
+    ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h
+    )
+target_link_libraries(utm_node nng::nng protobuf-c vutura_common)
+
+#add_executable(airmap_node src/airmap_node/airmap_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
+#target_link_libraries(airmap_node nng::nng protobuf-c curl cjson nlohmann_json::nlohmann_json protobuf)
 
 add_executable(airmap_telemetry src/airmap_node/airmap_telemetry.cpp  ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h ${CMAKE_SOURCE_DIR}/include/proto/messages.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/messages.pb.h)
 target_link_libraries(airmap_telemetry nlohmann_json::nlohmann_json protobuf cryptopp curl nng::nng)
