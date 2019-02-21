@@ -64,7 +64,7 @@ Subscription::Subscription(void *node, std::string url, void(*cb)(EventSource *)
 	_url(url)
 {
 	int rv;
-	// Listen to position data
+
 	if ((rv = nng_sub0_open(&_socket)) != 0) {
 		fatal("nng_sub0_open", rv);
 	}
@@ -76,6 +76,16 @@ Subscription::Subscription(void *node, std::string url, void(*cb)(EventSource *)
 	if ((rv = nng_dial(_socket, _url.c_str(), NULL, NNG_FLAG_NONBLOCK))) {
 		fatal("nng_listen", rv);
 	}
+
+	// Set re-connect time to 500ms, helps when starting subscriber first
+	if ((rv = nng_setopt_ms(_socket, NNG_OPT_RECONNMINT, 500)) != 0) {
+		fatal("nng_setopt_ms", rv);
+	}
+
+	if ((rv = nng_setopt_ms(_socket, NNG_OPT_RECONNMAXT, 0)) != 0) {
+		fatal("nng_setopt_ms", rv);
+	}
+
 
 	if ((rv = nng_getopt_int(_socket, NNG_OPT_RECVFD, &_fd))) {
 		fatal("nng_getopt", rv);
