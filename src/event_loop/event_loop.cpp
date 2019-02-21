@@ -1,5 +1,14 @@
 #include <sys/stat.h>
 #include "event_loop.hpp"
+#include <nng/protocol/pubsub0/sub.h>
+#include <nng/protocol/reqrep0/rep.h>
+
+
+void fatal(const char *func, int rv)
+{
+	fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
+	exit(1);
+}
 
 EventLoop::EventLoop() :
 	_should_exit(false)
@@ -42,7 +51,7 @@ void EventLoop::start()
 		}
 	}
 
-	std::cout << "Loop closed" << std::endl;
+	std::cout << std::endl << "Loop closed" << std::endl;
 }
 
 void EventLoop::stop()
@@ -50,8 +59,8 @@ void EventLoop::stop()
 	_should_exit = true;
 }
 
-Subscription::Subscription(std::string url, void(*cb)(EventSource*)) :
-	EventSource(cb),
+Subscription::Subscription(void *node, std::string url, void(*cb)(EventSource *)) :
+	EventSource(node, -1, cb),
 	_url(url)
 {
 	int rv;
@@ -73,8 +82,21 @@ Subscription::Subscription(std::string url, void(*cb)(EventSource*)) :
 	}
 }
 
-void Subscription::fatal(const char *func, int rv)
+Replier::Replier(void *node, std::string url, void (*cb)(EventSource *)) :
+	EventSource(node, -1, cb),
+	_url(url)
 {
-	fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
-	exit(1);
+	int rv;
+	// Configure reply topic for utmsp request
+	if ((rv = nng_rep0_open(&_socket)) != 0) {
+		fatal("nng_rep0_open", rv);
+	}
+
+	if ((rv = nng_listen(_socket, _url.c_str(), NULL, NNG_FLAG_NONBLOCK))) {
+		fatal("nng_listen", rv);
+	}
+
+	if ((rv = nng_getopt_int(_socket, NNG_OPT_RECVFD, &_fd))) {
+		fatal("nng_getopt", rv);
+	}
 }

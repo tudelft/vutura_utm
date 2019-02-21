@@ -612,6 +612,8 @@ public:
 	int set_position(float latitude, float longitude, float alt_msl, float alt_agl) {
 		_lat = latitude;
 		_lon = longitude;
+		_alt_msl = alt_msl;
+		_alt_agl = alt_agl;
 		_has_position_data = true;
 
 		// If we have a comms key, send telemetry
@@ -627,8 +629,8 @@ public:
 		position.set_timestamp(getTimeStamp());
 		position.set_latitude(_lat);
 		position.set_longitude(_lon);
-		position.set_altitude_agl(50);
-		position.set_altitude_msl(50);
+		position.set_altitude_agl(_alt_agl);
+		position.set_altitude_msl(_alt_msl);
 		position.set_horizontal_accuracy(10);
 		auto messagePosition = position.SerializeAsString();
 		_payload.add<std::uint16_t>(htons(static_cast<std::uint16_t>(Type::position)))
@@ -691,11 +693,11 @@ private:
 
 void handle_utmsp_update(EventSource* es)
 {
-	nng_socket *sock = static_cast<nng_socket*>(es->_source_object);
-	AirmapNode *node = static_cast<AirmapNode*>(es->_target_object);
+	Replier *rep = static_cast<Replier*>(es);
+	AirmapNode *node = static_cast<AirmapNode*>(rep->_target_object);
 	const char* reply = "OK";
 	nng_msg *msg;
-	nng_recvmsg(*sock, &msg, 0);
+	nng_recvmsg(rep->_socket, &msg, 0);
 	std::cout << (char*)nng_msg_body(msg) << " " << strlen(reply) << std::endl;
 
 	std::string request((char*)nng_msg_body(msg), (char*)nng_msg_body(msg) + nng_msg_len(msg));
@@ -711,7 +713,7 @@ void handle_utmsp_update(EventSource* es)
 
 	nng_msg_realloc(msg, strlen(reply));
 	memcpy((char*)nng_msg_body(msg), reply, strlen(reply));
-	nng_sendmsg(*sock, msg, 0);
+	nng_sendmsg(rep->_socket, msg, 0);
 }
 
 void handle_request(AirmapNode* node, nng_msg *msg)
@@ -748,53 +750,23 @@ void handle_position_update(EventSource* es)
 
 }
 
-void fatal(const char *func, int rv)
-{
-	fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
-	exit(1);
-}
-
 // main
 int main(int argc, char* argv[])
 {
 	AirmapNode node;
 	// authenticate etc
 	node.start();
-//	node.set_position(52.170365387094016, 4.4171905517578125);
+//	node.set_position(52.170365387094016, 4.4171905517578125, 10, 10);
 
-	// Listen for nng messages in an event loop
-	nng_socket utmsp_sock;
-	int utmsp_fd = -1;
+	EventLoop eventloop;
 
-	nng_socket gps_position_sock;
-	int gps_position_fd = -1;
+	Replier utmsp(&node, "ipc:///tmp/utmsp.sock", handle_utmsp_update);
+	eventloop.add(utmsp);
 
-	int rv;
+	Subscription gps_position(&node, "ipc:///tmp/gps_position.sock", handle_position_update);
+	eventloop.add(gps_position);
 
-	// Configure reply topic for utmsp request
-	if ((rv = nng_rep0_open(&utmsp_sock)) != 0) {
-		fatal("nng_rep0_open", rv);
-	}
-
-	if ((rv = nng_listen(utmsp_sock, "ipc:///tmp/utmsp.sock", NULL, NNG_FLAG_NONBLOCK))) {
-		fatal("nng_listen", rv);
-	}
-
-	if ((rv = nng_getopt_int(utmsp_sock, NNG_OPT_RECVFD, &utmsp_fd))) {
-		fatal("nng_getopt", rv);
-	}
-
-	EventSource utmsp(utmsp_fd, handle_utmsp_update);
-	utmsp.set_source_object(&utmsp_sock);
-	utmsp.set_target_object(&node);
-
-	Subscription gps_position("ipc:///tmp/gps_position.sock", handle_position_update);
-	gps_position.set_target_object(&node);
-
-	EventLoop loop;
-	loop.add(utmsp);
-	loop.add(gps_position);
-	loop.start();
+	eventloop.start();
 
 	return 0;
 }

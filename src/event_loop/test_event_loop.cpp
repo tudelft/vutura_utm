@@ -13,30 +13,51 @@ void timer_callback(EventSource* es)
 	std::cout << "timer event " << es->_fd << std::endl;
 }
 
-EventLoop loop;
+class TestClass {
+public:
+	TestClass() {
+	}
+
+	void run() {
+
+		// Configure periodic timer for heartbeats
+		int timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
+		struct timespec ts = {0};
+		ts.tv_sec = 1;
+		struct itimerspec its = {0};
+		its.it_interval = ts;
+		its.it_value = ts;
+		if (timerfd_settime(timerfd, 0, &its, NULL) == -1) {
+			perror("setting timer");
+		}
+
+		EventSource src(nullptr, timerfd, &timer_callback);
+		_loop.add(src);
+
+		_loop.start();
+	}
+
+	void stop() {
+		_loop.stop();
+	}
+
+	static void test_callback(void* me, EventSource* es) {
+		std::cout << "test_callback " << std::endl;
+	}
+private:
+	EventLoop _loop;
+};
+
+TestClass testclass;
 
 void exit_handler(int s)
 {
-	loop.stop();
+	testclass.stop();
 }
 
 int main()
 {
 	signal(SIGINT, exit_handler);
 
-	// Configure periodic timer for heartbeats
-	int timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
-	struct timespec ts = {0};
-	ts.tv_sec = 1;
-	struct itimerspec its = {0};
-	its.it_interval = ts;
-	its.it_value = ts;
-	if (timerfd_settime(timerfd, 0, &its, NULL) == -1) {
-		perror("setting timer");
-	}
-
-	EventSource src(timerfd, &timer_callback);
-	loop.add(src);
-
-	loop.start();
+	testclass.run();
 }

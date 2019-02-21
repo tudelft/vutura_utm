@@ -204,7 +204,7 @@ int main(int argc, char **argv)
 		fatal("nng_pub0_open", rv);
 	}
 
-	if ((rv = nng_listen(node.pub_gps_position_socket, "ipc:///tmp/vutura/gps_position.sock", NULL, NNG_FLAG_NONBLOCK)) != 0) {
+	if ((rv = nng_listen(node.pub_gps_position_socket, "ipc:///tmp/gps_position.sock", NULL, NNG_FLAG_NONBLOCK)) != 0) {
 		fatal("nng_listen", rv);
 	}
 
