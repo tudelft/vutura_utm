@@ -4,7 +4,7 @@ project(vutura_utm)
 # Require nng for messaging between nodes
 find_package(nng CONFIG REQUIRED)
 find_package(Protobuf REQUIRED)
-find_package(cJSON REQUIRED)
+#find_package(cJSON REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
 
