@@ -86,7 +86,6 @@ Subscription::Subscription(void *node, std::string url, void(*cb)(EventSource *)
 		fatal("nng_setopt_ms", rv);
 	}
 
-
 	if ((rv = nng_getopt_int(_socket, NNG_OPT_RECVFD, &_fd))) {
 		fatal("nng_getopt", rv);
 	}

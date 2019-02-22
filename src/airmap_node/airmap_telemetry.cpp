@@ -181,6 +181,7 @@ public:
 			{"max_altitude_agl", 120},
 			{"takeoff_latitude", latitude},
 			{"takeoff_longitude", longitude},
+			{"rulesets", {"custom_z5d341_drone_rules"}},
 			{"geometry", {
 				 {"type", "Point"},
 				 {"coordinates", {
@@ -205,6 +206,22 @@ public:
 			return -1; // failed flight creation!
 		}
 		return 0;
+	}
+
+	int get_flight_briefing(const std::string& flightplanID) {
+		std::string url = m_url + "/flight/v2/plan/" + flightplanID + "/briefing";
+		std::string res;
+		if (CURLE_OK != curl_get(url.c_str(), m_headers, res)) {
+			return -1;
+		}
+
+		try{
+			auto j = nlohmann::json::parse(res);
+			std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
+		}
+		catch (...) {
+			return -1;
+		}
 	}
 
 	int submit_flight(const std::string& flightplanID, std::string& flightID) {
@@ -251,6 +268,13 @@ public:
 		std::string url = m_url + "/flight/v2/" + flightID + "/end";
 		std::string res;
 		curl_post(url.c_str(), m_headers, "", res);
+	}
+
+	void query_telemetry(std::string flightID) {
+		std::string url = m_url + "/archive/v1/telemetry/position?flight_id=" + flightID;
+		std::string res;
+		curl_get(url.c_str(), m_headers, res);
+		std::cout << res << std::endl;
 	}
 
 	int end_all_active_flights(std::string pilotID) {
@@ -539,11 +563,14 @@ public:
 		}
 
 		std::cout << "FlightplanID: " << _flightplanID << std::endl;
+
+		_communicator.get_flight_briefing(_flightplanID);
+
 	}
 
 	int start_flight() {
 		if (_flightplanID.size() == 0) {
-			std::cout << "_flightID empty" << std::endl;
+			std::cout << "_flightplanID empty" << std::endl;
 			return -1;
 		}
 
@@ -602,6 +629,7 @@ public:
 
 	int end_flight() {
 		// end communication and flight
+		_communicator.query_telemetry(_flightID);
 		_communicator.end(_flightID);
 		_communicator.end_flight(_flightID);
 		_commsKey = "";
@@ -744,7 +772,7 @@ void handle_position_update(EventSource* es)
 	gps_msg.ParseFromArray(nng_msg_body(msg), nng_msg_len(msg));
 	if (gps_msg.has_lat() && gps_msg.has_lon()) {
 		node->set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7, gps_msg.alt_msl() * 1e-3, gps_msg.alt_agl() * 1e-3);
-		std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
+		//std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
 	}
 	nng_msg_free(msg);
 
