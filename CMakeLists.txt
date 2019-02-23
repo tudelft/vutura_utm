@@ -8,6 +8,7 @@ find_package(nng CONFIG REQUIRED)
 find_package(Protobuf REQUIRED)
 #find_package(cJSON REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(PahoMqttCpp REQUIRED)
 
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/include/proto)
 
@@ -59,6 +60,8 @@ target_link_libraries(utm_node nng::nng protobuf-c vutura_common)
 
 add_executable(airmap_telemetry
     src/airmap_node/airmap_telemetry.cpp
+    src/airmap_node/airmap_traffic.cpp
+    src/airmap_node/airmap_traffic.hpp
     ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc
     ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h
     ${CMAKE_SOURCE_DIR}/include/proto/messages.pb.cc
@@ -70,4 +73,5 @@ target_link_libraries(airmap_telemetry
     cryptopp
     curl
     nng::nng
+    paho-mqttpp3
     vutura_common)
