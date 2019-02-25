@@ -41,7 +41,8 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 {
 	std::string flightID_;
 
-	std::string mqtt_topic = "uav/traffic/sa/" + flightID_;
+	std::string sa_topic = "uav/traffic/+/" + flightID_;
+//	std::string alert_topic = "uav/traffic/alert/" + flightID_;
 
 	// Counter for the number of connection retries
 	int nretry_;
@@ -84,12 +85,11 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 	// (Re)connection success
 	void connected(const std::string& cause) override {
 		std::cout << "\nConnection success" << std::endl;
-		std::cout << "\nSubscribing to topic '" << mqtt_topic << "'\n"
+		std::cout << "\nSubscribing to topic '" << sa_topic << "'\n"
 			  << "\tfor client " << CLIENT_ID
-			  << " using QoS" << QOS << "\n"
-			  << "\nPress Q<Enter> to quit\n" << std::endl;
+			  << " using QoS" << QOS << "\n" << std::endl;
 
-		cli_.subscribe(mqtt_topic, QOS, nullptr, subListener_);
+		cli_.subscribe(sa_topic, QOS, nullptr, subListener_);
 	}
 
 	// Callback for when the connection is lost.
@@ -127,7 +127,6 @@ public:
 
 	int start(const std::string &flightID, const std::string &token);
 	int stop();
-	int disconnect();
 
 private:
 	mqtt::async_client _client;

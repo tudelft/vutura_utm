@@ -47,6 +47,8 @@ int AirmapTraffic::start(const std::string& flightID, const std::string& token)
 
 int AirmapTraffic::stop()
 {
+	_client.disconnect();
+
 	if (_cb != nullptr) {
 		delete _cb;
 		_cb = nullptr;
