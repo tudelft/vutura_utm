@@ -27,6 +27,7 @@
 #include "airmap_config.h"
 #include "messages.pb.h"
 #include "event_loop.hpp"
+#include "airmap_traffic.hpp"
 
 // command to build with g++
 // g++ -std=c++1y -o "telemetry" telemetry.pb.cc telemetry.cpp -lcurl -lcryptopp -lprotobuf
@@ -133,8 +134,8 @@ public:
 		std::cout << res << std::endl;
 		auto j = nlohmann::json::parse(res);
 		try {
-			std::string token = j["id_token"];
-			m_headers = curl_slist_append(m_headers, ("Authorization: Bearer " + token).c_str());
+			m_token = j["id_token"];
+			m_headers = curl_slist_append(m_headers, ("Authorization: Bearer " + m_token).c_str());
 			m_headers = curl_slist_append(m_headers, "Accept: application/json");
 			m_headers = curl_slist_append(m_headers, "Content-Type: application/json");
 			m_headers = curl_slist_append(m_headers, "charsets: utf-8");
@@ -277,6 +278,10 @@ public:
 		std::cout << res << std::endl;
 	}
 
+	std::string& get_token() {
+		return m_token;
+	}
+
 	int end_all_active_flights(std::string pilotID) {
 		// must have a pilot id for this
 
@@ -362,6 +367,7 @@ private:
 
 	struct curl_slist *m_headers;
 	std::string m_url;
+	std::string m_token;
 };
 
 // UdpSender
@@ -586,6 +592,8 @@ public:
 			return -1;
 		}
 
+		_traffic.start(_flightID, _communicator.get_token());
+
 		std::cout << "telemetry comms key: " << _commsKey << std::endl;
 
 		if (-1 == _udp.connect()) {
@@ -681,7 +689,7 @@ public:
 
 		// send packet
 		if (_udp.sendmsg(data.c_str(), length) == length) {
-			std::cout << "Telemetry packet sent successfully!" << std::endl;
+			//std::cout << "Telemetry packet sent successfully!" << std::endl;
 		}
 
 
@@ -704,6 +712,8 @@ private:
 	std::string _cipher;
 	std::vector<std::uint8_t> _iv;
 	Buffer _payload;
+
+	AirmapTraffic _traffic;
 
 	const uint8_t _encryptionType;
 	std::string _pilotID;
