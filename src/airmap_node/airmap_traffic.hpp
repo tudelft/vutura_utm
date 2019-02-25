@@ -1,8 +1,12 @@
 #ifndef AIRMAP_TRAFFIC_HPP
 #define AIRMAP_TRAFFIC_HPP
 
+#include <nng/nng.h>
+#include <nng/protocol/pubsub0/pub.h>
 #include "airmap_config.h"
 #include "mqtt/async_client.h"
+#include "nlohmann/json.hpp"
+#include "messages.pb.h"
 
 
 const int	QOS = 1;
@@ -40,9 +44,10 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 		public virtual mqtt::iaction_listener
 {
 	std::string flightID_;
+	nng_socket *pub_traffic_;
 
 	std::string sa_topic = "uav/traffic/+/" + flightID_;
-//	std::string alert_topic = "uav/traffic/alert/" + flightID_;
+	//	std::string alert_topic = "uav/traffic/alert/" + flightID_;
 
 	// Counter for the number of connection retries
 	int nretry_;
@@ -109,13 +114,43 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 		std::cout << "Message arrived" << std::endl;
 		std::cout << "\ttopic: '" << msg->get_topic() << "'" << std::endl;
 		std::cout << "\tpayload: '" << msg->to_string() << "'\n" << std::endl;
+
+		nlohmann::json j = nlohmann::json::parse(msg->to_string());
+
+		try {
+			nlohmann::json traffic = j["traffic"];
+			for (nlohmann::json::iterator it = traffic.begin(); it != traffic.end(); ++it) {
+//				std::cout << (*it).dump(4) << '\n';
+				TrafficInfo tinfo;
+				tinfo.set_unique_id((*it)["id"].get<std::string>());
+				tinfo.set_aircraft_id((*it)["properties"]["aircraft_id"].get<std::string>());
+				tinfo.set_timestamp((*it)["timestamp"].get<uint64_t>() / 1000);
+				tinfo.set_recorded_time(std::stoull( (*it)["recorded_time"].get<std::string>() ));
+				tinfo.set_lat(static_cast<int32_t>(std::stod( (*it)["latitude"].get<std::string>() ) * 1e7 ));
+				tinfo.set_lon(static_cast<int32_t>(std::stod( (*it)["longitude"].get<std::string>() ) * 1e7 ));
+				tinfo.set_alt(static_cast<int32_t>(std::stod( (*it)["altitude"].get<std::string>() ) * 1e3 ));
+				tinfo.set_groundspeed(static_cast<uint32_t>(std::stod( (*it)["groundspeed"].get<std::string>() ) * 1e3));
+				tinfo.set_heading(std::stoul( (*it)["true_heading"].get<std::string>() ));
+				std::string tinfo_data = tinfo.SerializeAsString();
+
+				nng_msg *nngmsg;
+				nng_msg_alloc(&nngmsg, tinfo_data.length());
+				memcpy((char*)nng_msg_body(nngmsg), tinfo_data.c_str(), tinfo_data.length());
+				nng_sendmsg(*pub_traffic_, nngmsg, 0);
+				std::cout << "Published traffic: " << tinfo.unique_id() << std::endl;
+			}
+			//std::cout << j["traffic"].dump(4) << std::endl;
+		} catch (...) {
+			std::cerr << "json parse fail" << std::endl;
+		}
+
 	}
 
 	void delivery_complete(mqtt::delivery_token_ptr token) override {}
 
 public:
-	AirmapTrafficCallback(mqtt::async_client& cli, mqtt::connect_options& connOpts, const std::string& flightID)
-		: nretry_(0), cli_(cli), connOpts_(connOpts), subListener_("Subscription"), flightID_(flightID) {}
+	AirmapTrafficCallback(mqtt::async_client& cli, mqtt::connect_options& connOpts, const std::string& flightID, nng_socket& pub_traffic)
+		: nretry_(0), cli_(cli), connOpts_(connOpts), subListener_("Subscription"), flightID_(flightID), pub_traffic_(&pub_traffic) {}
 };
 
 
@@ -133,6 +168,8 @@ private:
 	mqtt::connect_options _conn_opts;
 	AirmapTrafficCallback* _cb;
 	mqtt::ssl_options _sslopts;
+
+	nng_socket _pub_traffic;
 };
 
 #endif // AIRMAP_TRAFFIC_HPP

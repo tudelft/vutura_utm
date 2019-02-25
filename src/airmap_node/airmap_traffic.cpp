@@ -6,6 +6,17 @@ AirmapTraffic::AirmapTraffic() :
 {
 	_conn_opts.set_keep_alive_interval(20);
 	_conn_opts.set_clean_session(true);
+
+	// Open nng socket for publishing traffic info
+	int rv;
+
+	if ((rv = nng_pub0_open(&_pub_traffic)) != 0) {
+		std::cerr << "nng_pub0_open pub traffic: " << nng_strerror(rv) << std::endl;
+	}
+
+	if ((rv = nng_listen(_pub_traffic, "ipc:///tmp/traffic_info.sock", NULL, 0)) != 0) {
+		std::cerr << "nng_listen pub traffic: " << nng_strerror(rv) << std::endl;
+	}
 }
 
 AirmapTraffic::~AirmapTraffic()
@@ -33,7 +44,7 @@ int AirmapTraffic::start(const std::string& flightID, const std::string& token)
 
 	_conn_opts.set_ssl(_sslopts);
 
-	_cb = new AirmapTrafficCallback(_client, _conn_opts, flightID);
+	_cb = new AirmapTrafficCallback(_client, _conn_opts, flightID, _pub_traffic);
 	_client.set_callback(*_cb);
 
 	try {

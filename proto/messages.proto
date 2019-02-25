@@ -8,6 +8,18 @@ message GPSMessage {
   required sint32 alt_agl = 5;
 }
 
+message TrafficInfo {
+  required string unique_id = 1;
+  required string aircraft_id = 2;
+  required uint64 timestamp = 3;
+  required uint64 recorded_time = 4;
+  required sint32 lat = 5;
+  required sint32 lon = 6;
+  required sint32 alt = 7;
+  required uint32 groundspeed = 8;
+  required uint32 heading = 9;
+}
+
 message UavHeartbeat {
   optional bool armed = 1;
 }

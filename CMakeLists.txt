@@ -27,7 +27,7 @@ file(GLOB proto_c_files ${CMAKE_SOURCE_DIR}/include/proto/*.c)
 add_custom_command(
     PRE_BUILD
     COMMAND protoc --proto_path=${CMAKE_SOURCE_DIR}/proto --cpp_out=${CMAKE_SOURCE_DIR}/include/proto ${CMAKE_SOURCE_DIR}/proto/airmap_telemetry.proto ${CMAKE_SOURCE_DIR}/proto/messages.proto
-    DEPENDS ${CMAKE_SOURCE_DIR}/proto/airmap_telemetry.proto
+    DEPENDS ${CMAKE_SOURCE_DIR}/proto/airmap_telemetry.proto ${CMAKE_SOURCE_DIR}/proto/messages.proto
     OUTPUT ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/airmap_telemetry.pb.h ${CMAKE_SOURCE_DIR}/include/proto/messages.pb.cc ${CMAKE_SOURCE_DIR}/include/proto/messages.pb.h
 )
 
