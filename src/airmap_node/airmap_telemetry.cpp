@@ -218,9 +218,11 @@ public:
 
 		try{
 			auto j = nlohmann::json::parse(res);
-			std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
+//			std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
+			std::cout << "Authorization request: " << j["data"]["authorizations"][0]["status"] << std::endl;
 		}
 		catch (...) {
+			std::cout << "Error get briefing" << std::endl;
 			return -1;
 		}
 	}
@@ -646,6 +648,10 @@ public:
 		_flightplanID = "";
 	}
 
+	int get_brief() {
+		_communicator.get_flight_briefing(_flightplanID);
+	}
+
 	int set_position(float latitude, float longitude, float alt_msl, float alt_agl) {
 		_lat = latitude;
 		_lon = longitude;
@@ -748,6 +754,10 @@ void handle_utmsp_update(EventSource* es)
 
 	} else if (request == "end_flight") {
 		node->end_flight();
+
+	} else if (request == "get_brief") {
+		node->get_brief();
+
 	}
 
 	nng_msg_realloc(msg, strlen(reply));
