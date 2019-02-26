@@ -115,6 +115,7 @@ public:
 		m_url = "https://" AIRMAP_HOST;
 		m_headers = NULL;
 		m_headers = curl_slist_append(m_headers, ("X-API-KEY: " + apiKey).c_str());
+		m_authorization_status = "";
 		curl_global_init(CURL_GLOBAL_DEFAULT);
 	}
 
@@ -220,11 +221,20 @@ public:
 			auto j = nlohmann::json::parse(res);
 //			std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
 			std::cout << "Authorization request: " << j["data"]["authorizations"][0]["status"] << std::endl;
+			m_authorization_status = j["data"]["authorizations"][0]["status"];
 		}
 		catch (...) {
 			std::cout << "Error get briefing" << std::endl;
 			return -1;
 		}
+	}
+
+	bool flight_authorized() {
+		bool ret = false;
+		if (m_authorization_status == "authorized") {
+			ret = true;
+		}
+		return ret;
 	}
 
 	int submit_flight(const std::string& flightplanID, std::string& flightID) {
@@ -370,6 +380,7 @@ private:
 	struct curl_slist *m_headers;
 	std::string m_url;
 	std::string m_token;
+	std::string m_authorization_status;
 };
 
 // UdpSender
@@ -530,6 +541,7 @@ private:
 class AirmapNode {
 public:
 	AirmapNode() :
+		_state(STATE_INIT),
 		_communicator(AIRMAP_API_KEY),
 		_udp(AIRMAP_TELEM_HOST, AIRMAP_TELEM_PORT),
 		_encryptionType(1),
@@ -557,6 +569,8 @@ public:
 
 		_communicator.end_all_active_flights(_pilotID);
 
+		_state = STATE_LOGGED_IN;
+
 		return 0;
 	}
 
@@ -574,20 +588,42 @@ public:
 
 		_communicator.get_flight_briefing(_flightplanID);
 
-	}
-
-	int start_flight() {
-		if (_flightplanID.size() == 0) {
-			std::cout << "_flightplanID empty" << std::endl;
-			return -1;
-		}
-
 		if (-1 == _communicator.submit_flight(_flightplanID, _flightID)) {
 			std::cout << "Flight Submission Failed!" << std::endl;
 			return -1;
 		}
 
 		std::cout << "FlightID: " << _flightID << std::endl;
+
+		if (_communicator.flight_authorized()) {
+			_state = STATE_FLIGHT_AUTHORIZED;
+		} else {
+			_state = STATE_FLIGHT_REQUESTED;
+		}
+	}
+
+	int periodic() {
+		if (_state == STATE_FLIGHT_REQUESTED) {
+			get_brief();
+
+			if (_state == STATE_FLIGHT_AUTHORIZED) {
+				std::cout << "Flight authorized, starting!" << std::endl;
+				start_flight();
+			}
+		}
+	}
+
+	int start_flight() {
+		if (_flightID.size() == 0) {
+			std::cout << "_flightID empty" << std::endl;
+			return -1;
+		}
+
+		if (!_communicator.flight_authorized()) {
+			std::cout << "Authorization status does not (yet) allow start of flight" << std::endl;
+			_state = STATE_FLIGHT_REQUESTED;
+			return -1;
+		}
 
 		if (-1 == _communicator.start(_flightID, _commsKey)) {
 			std::cout << "Communication Failed!" << std::endl;
@@ -606,35 +642,7 @@ public:
 		// serial number
 		_comms_counter = 1;
 
-		/*
-		// send 100 packets @ 5 Hz
-		for (int i = 0; i < 5*60; ++i) {
-			// build payload
-			payloadBuilder.build(payload);
-
-			// encrypt payload
-			crypto.encrypt(key, payload, cipher, iv);
-
-			// build UDP packet
-			Buffer packet;
-			packet.add<std::uint32_t>(htonl(counter++))
-					.add<std::uint8_t>(flightID.size())
-					.add(flightID)
-					.add<std::uint8_t>(encryptionType)
-					.add(iv)
-					.add(cipher);
-			std::string data = packet.get();
-			int length = static_cast<int>(data.size());
-
-			// send packet
-			if (udp.sendmsg(data.c_str(), length) == length)
-				std::cout << "Telemetry packet sent successfully!" << std::endl;
-
-			usleep(200000); // 5 Hz
-		}
-		*/
-
-
+		_state = STATE_FLIGHT_STARTED;
 	}
 
 	int end_flight() {
@@ -646,6 +654,7 @@ public:
 		_commsKey = "";
 		_flightID = "";
 		_flightplanID = "";
+		_state = STATE_LOGGED_IN;
 	}
 
 	int get_brief() {
@@ -710,6 +719,14 @@ public:
 
 
 private:
+
+	enum AirmapState {
+		STATE_INIT,
+		STATE_LOGGED_IN,
+		STATE_FLIGHT_REQUESTED,
+		STATE_FLIGHT_AUTHORIZED,
+		STATE_FLIGHT_STARTED
+	} _state;
 
 	bool has_position_data() { return _has_position_data; }
 
@@ -799,6 +816,15 @@ void handle_position_update(EventSource* es)
 
 }
 
+void handle_periodic_timer(EventSource* es) {
+	AirmapNode *node = static_cast<AirmapNode*>(es->_target_object);
+	uint64_t num_timer_events;
+	ssize_t recv_size = read(es->_fd, &num_timer_events, 8);
+	(void) recv_size;
+
+	node->get_brief();
+}
+
 // main
 int main(int argc, char* argv[])
 {
@@ -814,6 +840,9 @@ int main(int argc, char* argv[])
 
 	Subscription gps_position(&node, "ipc:///tmp/gps_position.sock", handle_position_update);
 	eventloop.add(gps_position);
+
+	Timer periodic_timer(&node, 2000, handle_periodic_timer);
+	eventloop.add(periodic_timer);
 
 	eventloop.start();
 

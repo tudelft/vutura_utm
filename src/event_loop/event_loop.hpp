@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <poll.h>
+#include <sys/timerfd.h>
 #include <nng/nng.h>
 
 
@@ -49,6 +50,12 @@ public:
 
 private:
 	std::string _url;
+};
+
+class Timer: public EventSource {
+public:
+	Timer(void *node, uint32_t interval_ms, void(*cb)(EventSource*));
+
 };
 
 class EventLoop
