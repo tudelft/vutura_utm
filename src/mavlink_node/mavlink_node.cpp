@@ -7,10 +7,13 @@
 #include <string.h>
 #include <poll.h>
 #include <sys/timerfd.h>
+#include <string>
+#include <iostream>
 
 #include <nng/nng.h>
 #include <nng/protocol/reqrep0/rep.h>
 #include <nng/protocol/pubsub0/pub.h>
+#include <nng/protocol/pubsub0/sub.h>
 
 #include "mavlink_node.h"
 #include <mavlink.h>
@@ -27,8 +30,8 @@ typedef struct mavlink_node_t
 	struct sockaddr_in uav_addr;
 	struct sockaddr_in loc_addr;
 	uint8_t buf[BUFFER_LENGTH];
-	nng_socket rep_fp_socket;
-	int rep_fp_fd;
+	nng_socket sub_cmd_socket;
+	int sub_cmd_fd;
 	nng_socket pub_gps_position_socket;
 //	int pub_gps_position_fd;
 	nng_socket pub_uav_heartbeat_socket;
@@ -56,7 +59,7 @@ void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
 	if (msg->msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
 		mavlink_global_position_int_t global_pos;
 		mavlink_msg_global_position_int_decode(msg, &global_pos);
-		printf("[%s] got global position lat: %f lon: %f alt_msl: %f alt_agl: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7, global_pos.alt * 1e-3, global_pos.relative_alt * 1e-3);
+		//printf("[%s] got global position lat: %f lon: %f alt_msl: %f alt_agl: %f\n", node->name, global_pos.lat * 1e-7, global_pos.lon * 1e-7, global_pos.alt * 1e-3, global_pos.relative_alt * 1e-3);
 		GPSMessage gps_message = GPSMESSAGE__INIT;
 		uint16_t len;
 		gps_message.timestamp = 0;
@@ -97,8 +100,23 @@ void mavlink_node_incoming_message(mavlink_node_t *node, mavlink_message_t *msg)
 void mavlink_node_handle_request(mavlink_node_t *node, nng_msg *msg)
 {
 	// This function needs to free the msg when finished using it
-	printf("Got %s\theader length: %lu\n", (char*)nng_msg_body(msg), nng_msg_header_len(msg));
+	//printf("Got %s\theader length: %lu\n", (char*)nng_msg_body(msg), nng_msg_header_len(msg));
 
+	// unpack command
+	std::string request((char*)nng_msg_body(msg), (char*)nng_msg_body(msg) + nng_msg_len(msg));
+
+	if (request == "start mission") {
+		std::cout << "Should start mission now." << std::endl;
+	} else {
+		std::cout << "Received: " << request << std::endl;
+	}
+
+	std::string reply = "OK";
+	nng_msg_realloc(msg, reply.length());
+	memcpy(nng_msg_body(msg), reply.c_str(), reply.length());
+	nng_sendmsg(node->sub_cmd_socket, msg, 0);
+
+	/*
 	// send reply
 
 	Flightplan fp = FLIGHTPLAN__INIT;
@@ -125,8 +143,10 @@ void mavlink_node_handle_request(mavlink_node_t *node, nng_msg *msg)
 	nng_msg_realloc(msg, len);
 	flightplan__pack(&fp, nng_msg_body(msg));
 
+	*/
+
 	// This function frees the msg
-	nng_sendmsg(node->rep_fp_socket, msg, 0);
+	nng_sendmsg(node->sub_cmd_socket, msg, 0);
 }
 
 void
@@ -141,9 +161,7 @@ int main(int argc, char **argv)
 	mavlink_node_t node = {
 		.name = "mavlink",
 		.uav_sock = -1,
-		.timerfd = -1,
-		.rep_fp_fd = -1
-//		.pub_gps_position_fd = -1
+		.timerfd = -1
 	};
 
 	int rv;
@@ -187,15 +205,15 @@ int main(int argc, char **argv)
 	}
 
 	// Configure reply topic for flightplan request
-	if ((rv = nng_rep0_open(&node.rep_fp_socket)) != 0) {
+	if ((rv = nng_sub0_open(&node.sub_cmd_socket)) != 0) {
 		fatal("nng_rep0_open", rv);
 	}
 
-	if ((rv = nng_listen(node.rep_fp_socket, "ipc:///tmp/fp.sock", NULL, NNG_FLAG_NONBLOCK))) {
+	if ((rv = nng_dial(node.sub_cmd_socket, "ipc:///tmp/uav_command.sock", NULL, NNG_FLAG_NONBLOCK))) {
 		fatal("nng_listen", rv);
 	}
 
-	if ((rv = nng_getopt_int(node.rep_fp_socket, NNG_OPT_RECVFD, &node.rep_fp_fd)) != 0) {
+	if ((rv = nng_getopt_int(node.sub_cmd_socket, NNG_OPT_RECVFD, &node.sub_cmd_fd)) != 0) {
 		fatal("nng_getopt", rv);
 	}
 
@@ -218,7 +236,7 @@ int main(int argc, char **argv)
 	}
 
 	// Configure file descriptors for event listening
-	const unsigned int num_fds = 2;
+	const unsigned int num_fds = 3;
 	struct pollfd fds[num_fds];
 	fds[0].fd = node.uav_sock;
 	fds[0].events = POLLIN;
@@ -228,7 +246,7 @@ int main(int argc, char **argv)
 	fds[1].events = POLLIN;
 	fds[1].revents = 0;
 
-	fds[2].fd = node.rep_fp_fd;
+	fds[2].fd = node.sub_cmd_fd;
 	fds[2].events = POLLIN;
 	fds[2].revents = 0;
 
@@ -261,7 +279,7 @@ int main(int argc, char **argv)
 			uint64_t num_timer_events;
 			ssize_t recv_size = read(fds[1].fd, &num_timer_events, 8);
 			(void) recv_size;
-			//printf("timer %lu\n", recv_size);
+//			printf("timer %lu\n", recv_size);
 
 			// Call timer event
 			//printf("call mavlink_node_timer_event\n");
@@ -271,10 +289,10 @@ int main(int argc, char **argv)
 		}
 
 		if (fds[2].revents & POLLIN) {
-			nng_msg *fp_msg;
-			nng_recvmsg(node.rep_fp_socket, &fp_msg, NNG_FLAG_NONBLOCK);
-			mavlink_node_handle_request(&node, fp_msg);
-			if (fp_msg != NULL) {
+			nng_msg *cmd_msg;
+			nng_recvmsg(node.sub_cmd_socket, &cmd_msg, NNG_FLAG_NONBLOCK);
+			mavlink_node_handle_request(&node, cmd_msg);
+			if (cmd_msg != NULL) {
 				printf("NOT NULL");
 				//free(fp_msg);
 			}
@@ -284,7 +302,7 @@ int main(int argc, char **argv)
 
 	close(node.timerfd);
 	close(node.uav_sock);
-	nng_close(node.rep_fp_socket);
+	nng_close(node.sub_cmd_socket);
 
 	return 0;
 }

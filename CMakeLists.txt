@@ -36,7 +36,7 @@ include_directories(include/proto)
 include_directories(include)
 include_directories(src/event_loop)
 
-add_executable(mavlink_node src/mavlink_node/mavlink_node.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
+add_executable(mavlink_node src/mavlink_node/mavlink_node.cpp ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.c ${CMAKE_SOURCE_DIR}/include/proto/messages.pb-c.h)
 target_link_libraries(mavlink_node nng::nng protobuf-c)
 
 add_library(vutura_common

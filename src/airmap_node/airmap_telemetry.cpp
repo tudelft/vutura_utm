@@ -219,9 +219,14 @@ public:
 
 		try{
 			auto j = nlohmann::json::parse(res);
-//			std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
-			std::cout << "Authorization request: " << j["data"]["authorizations"][0]["status"] << std::endl;
-			m_authorization_status = j["data"]["authorizations"][0]["status"];
+			std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
+			if (j["data"]["authorizations"].size() == 0) {
+				m_authorization_status = "not required";
+			} else {
+//				std::cout << "Authorization request: " << j["data"]["authorizations"][0]["status"] << std::endl;
+				m_authorization_status = j["data"]["authorizations"][0]["status"];
+			}
+			std::cout << "Authorization status: " << m_authorization_status << std::endl;
 		}
 		catch (...) {
 			std::cout << "Error get briefing" << std::endl;
@@ -231,7 +236,8 @@ public:
 
 	bool flight_authorized() {
 		bool ret = false;
-		if (m_authorization_status == "authorized") {
+		if (m_authorization_status == "authorized" ||
+		    m_authorization_status == "not required") {
 			ret = true;
 		}
 		return ret;
@@ -540,7 +546,16 @@ private:
 
 class AirmapNode {
 public:
+	enum AirmapState {
+		STATE_INIT,
+		STATE_LOGGED_IN,
+		STATE_FLIGHT_REQUESTED,
+		STATE_FLIGHT_AUTHORIZED,
+		STATE_FLIGHT_STARTED
+	};
+
 	AirmapNode() :
+		_autostart_flight(false),
 		_state(STATE_INIT),
 		_communicator(AIRMAP_API_KEY),
 		_udp(AIRMAP_TELEM_HOST, AIRMAP_TELEM_PORT),
@@ -553,7 +568,62 @@ public:
 		_alt_msl(0),
 		_alt_agl(0)
 	{
+		// open socket for publishing utm status update
+		int rv;
 
+		if ((rv = nng_pub0_open(&_pub_utm_status_update)) != 0) {
+			std::cerr << "nng_pub0_open pub traffic: " << nng_strerror(rv) << std::endl;
+		}
+
+		if ((rv = nng_listen(_pub_utm_status_update, "ipc:///tmp/utm_status_update.sock", NULL, 0)) != 0) {
+			std::cerr << "nng_listen pub traffic: " << nng_strerror(rv) << std::endl;
+		}
+
+		if ((rv = nng_pub0_open(&_pub_uav_command)) != 0) {
+			std::cerr << "nng_pub0_open uav command: " << nng_strerror(rv) << std::endl;
+		}
+
+		if ((rv = nng_listen(_pub_uav_command, "ipc:///tmp/uav_command.sock", NULL, 0)) != 0) {
+			std::cerr << "nng_listen uav command: " << nng_strerror(rv) << std::endl;
+		}
+
+	}
+
+	void update_state(AirmapState new_state) {
+		_state = new_state;
+
+		std::string state = "";
+		switch (new_state) {
+		case STATE_INIT:
+			state = "init";
+			break;
+
+		case STATE_LOGGED_IN:
+			state = "logged in";
+			break;
+
+		case STATE_FLIGHT_REQUESTED:
+			state = "flight requested";
+			break;
+
+		case STATE_FLIGHT_AUTHORIZED:
+			state = "flight authorized";
+			break;
+
+		case STATE_FLIGHT_STARTED:
+			state = "flight started";
+			break;
+
+		default:
+			state = "unknown state";
+			break;
+		}
+
+		// publish on socket
+		nng_msg *msg;
+		nng_msg_alloc(&msg, state.length());
+		memcpy((char*)nng_msg_body(msg), state.c_str(), state.length());
+		nng_sendmsg(_pub_utm_status_update, msg, 0);
 	}
 
 	int start() {
@@ -569,7 +639,7 @@ public:
 
 		_communicator.end_all_active_flights(_pilotID);
 
-		_state = STATE_LOGGED_IN;
+		update_state(STATE_LOGGED_IN);
 
 		return 0;
 	}
@@ -596,9 +666,11 @@ public:
 		std::cout << "FlightID: " << _flightID << std::endl;
 
 		if (_communicator.flight_authorized()) {
-			_state = STATE_FLIGHT_AUTHORIZED;
+			update_state(STATE_FLIGHT_AUTHORIZED);
+
 		} else {
-			_state = STATE_FLIGHT_REQUESTED;
+			update_state(STATE_FLIGHT_REQUESTED);
+
 		}
 	}
 
@@ -621,8 +693,18 @@ public:
 
 		if (!_communicator.flight_authorized()) {
 			std::cout << "Authorization status does not (yet) allow start of flight" << std::endl;
-			_state = STATE_FLIGHT_REQUESTED;
+			update_state(STATE_FLIGHT_REQUESTED);
 			return -1;
+		}
+
+		if (_autostart_flight) {
+			// Send a command to arm the drone into mission mode
+			std::string command = "start mission";
+			// publish on socket
+			nng_msg *msg;
+			nng_msg_alloc(&msg, command.length());
+			memcpy((char*)nng_msg_body(msg), command.c_str(), command.length());
+			nng_sendmsg(_pub_utm_status_update, msg, 0);
 		}
 
 		if (-1 == _communicator.start(_flightID, _commsKey)) {
@@ -642,7 +724,7 @@ public:
 		// serial number
 		_comms_counter = 1;
 
-		_state = STATE_FLIGHT_STARTED;
+		update_state(STATE_FLIGHT_STARTED);
 	}
 
 	int end_flight() {
@@ -654,7 +736,7 @@ public:
 		_commsKey = "";
 		_flightID = "";
 		_flightplanID = "";
-		_state = STATE_LOGGED_IN;
+		update_state(STATE_LOGGED_IN);
 	}
 
 	int get_brief() {
@@ -717,16 +799,11 @@ public:
 		return static_cast<std::uint64_t>(tp.tv_sec) * 1000L + tp.tv_usec / 1000;
 	}
 
+	bool _autostart_flight;
 
 private:
 
-	enum AirmapState {
-		STATE_INIT,
-		STATE_LOGGED_IN,
-		STATE_FLIGHT_REQUESTED,
-		STATE_FLIGHT_AUTHORIZED,
-		STATE_FLIGHT_STARTED
-	} _state;
+	AirmapState _state;
 
 	bool has_position_data() { return _has_position_data; }
 
@@ -736,6 +813,9 @@ private:
 	std::string _cipher;
 	std::vector<std::uint8_t> _iv;
 	Buffer _payload;
+
+	nng_socket _pub_utm_status_update;
+	nng_socket _pub_uav_command;
 
 	AirmapTraffic _traffic;
 
@@ -763,10 +843,16 @@ void handle_utmsp_update(EventSource* es)
 	std::cout << (char*)nng_msg_body(msg) << " " << strlen(reply) << std::endl;
 
 	std::string request((char*)nng_msg_body(msg), (char*)nng_msg_body(msg) + nng_msg_len(msg));
+
+	node->_autostart_flight = false;
 	if (request == "request_flight") {
 		node->request_flight();
 
 	} else if (request == "start_flight") {
+		node->start_flight();
+
+	} else if (request == "autostart_flight") {
+		node->_autostart_flight = true;
 		node->start_flight();
 
 	} else if (request == "end_flight") {
@@ -822,7 +908,7 @@ void handle_periodic_timer(EventSource* es) {
 	ssize_t recv_size = read(es->_fd, &num_timer_events, 8);
 	(void) recv_size;
 
-	node->get_brief();
+	node->periodic();
 }
 
 // main
