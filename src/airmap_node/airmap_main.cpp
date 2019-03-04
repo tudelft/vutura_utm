@@ -25,7 +25,6 @@
 
 #include "airmap_node.hpp"
 
-
 void handle_utmsp_update(EventSource* es)
 {
 	ListenerReplier *rep = static_cast<ListenerReplier*>(es);

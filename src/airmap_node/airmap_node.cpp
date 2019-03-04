@@ -66,6 +66,8 @@ void AirmapNode::update_state(AirmapNode::AirmapState new_state) {
 		break;
 
 	case STATE_FLIGHT_STARTED:
+		// serial number
+		_comms_counter = 1;
 		state = "flight started";
 		break;
 
@@ -96,7 +98,13 @@ int AirmapNode::start() {
 }
 
 int AirmapNode::request_flight() {
+	if (_state != STATE_LOGGED_IN) {
+		std::cerr << "State not ready for request flight" << std::endl;
+		return -1;
+	}
+
 	if (!has_position_data()) {
+		std::cerr << "No position data available" << std::endl;
 		return -1;
 	}
 
@@ -129,7 +137,7 @@ int AirmapNode::periodic() {
 	if (_state == STATE_FLIGHT_REQUESTED) {
 		get_brief();
 
-		if (_state == STATE_FLIGHT_AUTHORIZED) {
+		if (_state == STATE_FLIGHT_AUTHORIZED && _autostart_flight) {
 			std::cout << "Flight authorized, starting!" << std::endl;
 			start_flight();
 		}
@@ -144,17 +152,14 @@ uint64_t AirmapNode::getTimeStamp() {
 
 int AirmapNode::get_brief() {
 	_communicator.get_flight_briefing(_flightplanID);
+	if (_communicator.flight_authorized()) {
+		update_state(STATE_FLIGHT_AUTHORIZED);
+	}
 }
 
 int AirmapNode::start_flight() {
-	if (_flightID.size() == 0) {
-		std::cout << "_flightID empty" << std::endl;
-		return -1;
-	}
-
-	if (!_communicator.flight_authorized()) {
-		std::cout << "Authorization status does not (yet) allow start of flight" << std::endl;
-		update_state(STATE_FLIGHT_REQUESTED);
+	if (_state != STATE_FLIGHT_AUTHORIZED) {
+		std::cerr << "Flight not authorized (yet)" << std::endl;
 		return -1;
 	}
 
@@ -162,7 +167,7 @@ int AirmapNode::start_flight() {
 		// Send a command to arm the drone into mission mode
 		std::string command = "start mission";
 		// publish on socket
-		_pub_utm_status_update.publish(command);
+		_pub_uav_command.publish(command);
 	}
 
 	if (-1 == _communicator.start(_flightID, _commsKey)) {
@@ -170,17 +175,17 @@ int AirmapNode::start_flight() {
 		return -1;
 	}
 
-	_traffic.start(_flightID, _communicator.get_token());
-
 	std::cout << "telemetry comms key: " << _commsKey << std::endl;
+
+	if (_traffic.start(_flightID, _communicator.get_token()) == -1) {
+		std::cerr << "MQTT traffic could not start" << std::endl;
+		return -1;
+	}
 
 	if (-1 == _udp.connect()) {
 		std::cout << "Failed to connect!" << std::endl;
 		return -1;
 	}
-
-	// serial number
-	_comms_counter = 1;
 
 	update_state(STATE_FLIGHT_STARTED);
 }

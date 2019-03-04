@@ -1,3 +1,4 @@
+#pragma once
 
 // Communicator
 class Communicator
@@ -111,7 +112,7 @@ public:
 
 		try{
 			auto j = nlohmann::json::parse(res);
-			std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
+			//std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
 			if (j["data"]["authorizations"].size() == 0) {
 				m_authorization_status = "not required";
 			} else {
@@ -128,7 +129,7 @@ public:
 
 	bool flight_authorized() {
 		bool ret = false;
-		if (m_authorization_status == "authorized" ||
+		if (m_authorization_status == "accepted" ||
 				m_authorization_status == "not required") {
 			ret = true;
 		}
@@ -185,7 +186,7 @@ public:
 		std::string url = m_url + "/archive/v1/telemetry/position?flight_id=" + flightID;
 		std::string res;
 		curl_get(url.c_str(), m_headers, res);
-		std::cout << res << std::endl;
+		std::cout << "telemetry positions: " << res << std::endl;
 	}
 
 	std::string& get_token() {

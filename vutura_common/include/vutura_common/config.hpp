@@ -1,5 +1,6 @@
 #pragma once
 
+#define MAVLINK_SYSTEM_ID 255
 #define MAVLINK_IP			"127.0.0.1"
 #define MAVLINK_PORT			14557
 

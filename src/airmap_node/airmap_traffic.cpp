@@ -53,12 +53,15 @@ int AirmapTraffic::start(const std::string& flightID, const std::string& token)
 		_client.connect(_conn_opts, nullptr, *_cb);
 	} catch (const mqtt::exception&) {
 		std::cerr << "Unable to connect to MQTT server" << std::endl;
-		return 1;
+		return -1;
 	}
+
+	return 0;
 }
 
 int AirmapTraffic::stop()
 {
+	std::cout << "Disconnecting MQTT" << std::endl;
 	_client.disconnect();
 
 	if (_cb != nullptr) {

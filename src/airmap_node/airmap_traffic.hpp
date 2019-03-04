@@ -111,9 +111,9 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 
 	// Callback for when a message arrives.
 	void message_arrived(mqtt::const_message_ptr msg) override {
-		std::cout << "Message arrived" << std::endl;
-		std::cout << "\ttopic: '" << msg->get_topic() << "'" << std::endl;
-		std::cout << "\tpayload: '" << msg->to_string() << "'\n" << std::endl;
+		//std::cout << "Message arrived" << std::endl;
+		//std::cout << "\ttopic: '" << msg->get_topic() << "'" << std::endl;
+		//std::cout << "\tpayload: '" << msg->to_string() << "'\n" << std::endl;
 
 		nlohmann::json j = nlohmann::json::parse(msg->to_string());
 
@@ -137,7 +137,7 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 				nng_msg_alloc(&nngmsg, tinfo_data.length());
 				memcpy((char*)nng_msg_body(nngmsg), tinfo_data.c_str(), tinfo_data.length());
 				nng_sendmsg(*pub_traffic_, nngmsg, 0);
-				std::cout << "Published traffic: " << tinfo.unique_id() << std::endl;
+				//std::cout << "Published traffic: " << tinfo.unique_id() << std::endl;
 			}
 			//std::cout << j["traffic"].dump(4) << std::endl;
 		} catch (...) {
