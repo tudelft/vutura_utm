@@ -28,6 +28,7 @@ public:
 	int get_brief();
 	int set_position(float latitude, float longitude, float alt_msl, float alt_agl);
 	std::uint64_t getTimeStamp();
+	int set_armed(bool armed);
 
 	bool _autostart_flight;
 

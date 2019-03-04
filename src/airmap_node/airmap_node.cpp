@@ -150,6 +150,18 @@ uint64_t AirmapNode::getTimeStamp() {
 	return static_cast<std::uint64_t>(tp.tv_sec) * 1000L + tp.tv_usec / 1000;
 }
 
+int AirmapNode::set_armed(bool armed)
+{
+	if (!armed) {
+		// disarm event
+		std::cout << "Disarm event" << std::endl;
+		if (_state == STATE_FLIGHT_STARTED) {
+			std::cout << "Automatically ending flight" << std::endl;
+			end_flight();
+		}
+	}
+}
+
 int AirmapNode::get_brief() {
 	_communicator.get_flight_briefing(_flightplanID);
 	if (_communicator.flight_authorized()) {
@@ -191,6 +203,10 @@ int AirmapNode::start_flight() {
 }
 
 int AirmapNode::end_flight() {
+	if (_state != STATE_FLIGHT_STARTED) {
+		std::cerr << "Flight not started, end first" << std::endl;
+		return -1;
+	}
 	// end communication and flight
 	_traffic.stop();
 	_communicator.query_telemetry(_flightID);

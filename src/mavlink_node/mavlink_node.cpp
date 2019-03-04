@@ -48,9 +48,8 @@ void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg)
 		// check if vehicle is armed
 		mavlink_heartbeat_t hb;
 		mavlink_msg_heartbeat_decode(msg, &hb);
-		UavHeartbeat uavhb;
-		uavhb.set_armed(hb.system_status == MAV_STATE_ACTIVE);
-		node->uav_armed_pub.publish(uavhb.SerializeAsString());
+
+		node->set_armed_state(hb.system_status == MAV_STATE_ACTIVE);
 	}
 }
 
@@ -77,6 +76,19 @@ void MavlinkNode::emit_heartbeat()
 	uint16_t len = mavlink_msg_to_send_buffer(mavlink_comm.buf, &msg);
 	mavlink_comm.send_buffer(len);
 	//printf("[%s] sent heartbeat %d bytes\n", node->name, bytes_sent);
+}
+
+void MavlinkNode::set_armed_state(bool armed)
+{
+	if (armed != _armed) {
+		// update state and publish
+		_armed = armed;
+
+		UavHeartbeat uavhb;
+		uavhb.set_armed(_armed);
+		uav_armed_pub.publish(uavhb.SerializeAsString());
+
+	}
 }
 
 void MavlinkNode::mavlink_comm_callback(EventSource *es) {

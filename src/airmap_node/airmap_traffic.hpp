@@ -141,7 +141,7 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 			}
 			//std::cout << j["traffic"].dump(4) << std::endl;
 		} catch (...) {
-			std::cerr << "json parse fail" << std::endl;
+			std::cerr << "json parse fail: " << msg->to_string() << std::endl;
 		}
 
 	}

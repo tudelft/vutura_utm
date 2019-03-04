@@ -70,6 +70,19 @@ void handle_position_update(EventSource* es)
 	}
 }
 
+void handle_uav_hb(EventSource* es) {
+	AirmapNode *node = static_cast<AirmapNode*>(es->_target_object);
+	Subscription *sub = static_cast<Subscription*>(es);
+
+	std::string msg = sub->get_message();
+
+	// unpack msg
+	UavHeartbeat hb;
+	hb.ParseFromString(msg);
+
+	node->set_armed(hb.armed());
+}
+
 void handle_periodic_timer(EventSource* es) {
 	AirmapNode *node = static_cast<AirmapNode*>(es->_target_object);
 	uint64_t num_timer_events;
@@ -94,6 +107,9 @@ int main(int argc, char* argv[])
 
 	Subscription gps_position(&node, SOCK_PUBSUB_GPS_POSITION, handle_position_update);
 	eventloop.add(gps_position);
+
+	Subscription uav_hb(&node, SOCK_PUBSUB_UAV_STATUS, handle_uav_hb);
+	eventloop.add(uav_hb);
 
 	Timer periodic_timer(&node, 2000, handle_periodic_timer);
 	eventloop.add(periodic_timer);

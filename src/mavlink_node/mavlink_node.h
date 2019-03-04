@@ -8,13 +8,15 @@ public:
 	MavlinkNode() :
 		mavlink_comm(this, MAVLINK_IP, MAVLINK_PORT, mavlink_comm_callback),
 		gps_pub(SOCK_PUBSUB_GPS_POSITION),
-		uav_armed_pub(SOCK_PUBSUB_UAV_STATUS)
+		uav_armed_pub(SOCK_PUBSUB_UAV_STATUS),
+		_armed(false)
 	{
 
 	}
 
 	void uav_command(std::string command);
 	void emit_heartbeat();
+	void set_armed_state(bool armed);
 
 	UdpSource mavlink_comm;
 
@@ -25,4 +27,6 @@ public:
 	static void heartbeat_timer_callback(EventSource* es);
 	static void uav_command_callback(EventSource* es);
 
+private:
+	bool _armed;
 };
