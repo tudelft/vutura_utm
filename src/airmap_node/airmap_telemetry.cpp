@@ -18,15 +18,15 @@
 #include <cryptopp/ccm.h>
 #include <cryptopp/filters.h>
 #include <cryptopp/osrng.h>
-// nanomsg next gen
-#include <nng/nng.h>
-#include <nng/protocol/reqrep0/req.h>
-#include <nng/protocol/reqrep0/rep.h>
-#include <nng/protocol/pubsub0/sub.h>
 
 #include "airmap_config.h"
-#include "messages.pb.h"
-#include "event_loop.hpp"
+#include "vutura_common/config.hpp"
+#include "vutura_common/vutura_common.pb.h"
+#include "vutura_common/listener_replier.hpp"
+#include "vutura_common/subscription.hpp"
+#include "vutura_common/timer.hpp"
+#include "vutura_common/publisher.hpp"
+#include "vutura_common/event_loop.hpp"
 #include "airmap_traffic.hpp"
 
 // command to build with g++
@@ -575,7 +575,7 @@ public:
 			std::cerr << "nng_pub0_open pub traffic: " << nng_strerror(rv) << std::endl;
 		}
 
-		if ((rv = nng_listen(_pub_utm_status_update, "ipc:///tmp/utm_status_update.sock", NULL, 0)) != 0) {
+		if ((rv = nng_listen(_pub_utm_status_update, SOCK_PUBSUB_UTM_STATUS_UPDATE, NULL, 0)) != 0) {
 			std::cerr << "nng_listen pub traffic: " << nng_strerror(rv) << std::endl;
 		}
 
@@ -583,7 +583,7 @@ public:
 			std::cerr << "nng_pub0_open uav command: " << nng_strerror(rv) << std::endl;
 		}
 
-		if ((rv = nng_listen(_pub_uav_command, "ipc:///tmp/uav_command.sock", NULL, 0)) != 0) {
+		if ((rv = nng_listen(_pub_uav_command, SOCK_PUBSUB_UAV_COMMAND, NULL, 0)) != 0) {
 			std::cerr << "nng_listen uav command: " << nng_strerror(rv) << std::endl;
 		}
 
@@ -790,7 +790,6 @@ public:
 			//std::cout << "Telemetry packet sent successfully!" << std::endl;
 		}
 
-
 	}
 
 	std::uint64_t getTimeStamp() {
@@ -835,14 +834,9 @@ private:
 
 void handle_utmsp_update(EventSource* es)
 {
-	Replier *rep = static_cast<Replier*>(es);
+	ListenerReplier *rep = static_cast<ListenerReplier*>(es);
 	AirmapNode *node = static_cast<AirmapNode*>(rep->_target_object);
-	const char* reply = "OK";
-	nng_msg *msg;
-	nng_recvmsg(rep->_socket, &msg, 0);
-	std::cout << (char*)nng_msg_body(msg) << " " << strlen(reply) << std::endl;
-
-	std::string request((char*)nng_msg_body(msg), (char*)nng_msg_body(msg) + nng_msg_len(msg));
+	std::string request = rep->get_message();
 
 	node->_autostart_flight = false;
 	if (request == "request_flight") {
@@ -862,10 +856,8 @@ void handle_utmsp_update(EventSource* es)
 		node->get_brief();
 
 	}
-
-	nng_msg_realloc(msg, strlen(reply));
-	memcpy((char*)nng_msg_body(msg), reply, strlen(reply));
-	nng_sendmsg(rep->_socket, msg, 0);
+	const std::string reply = "OK";
+	rep->send_response(reply);
 }
 
 void handle_request(AirmapNode* node, nng_msg *msg)
@@ -886,20 +878,17 @@ void handle_position_update(EventSource* es)
 {
 	AirmapNode *node = static_cast<AirmapNode*>(es->_target_object);
 	Subscription *sub = static_cast<Subscription*>(es);
-	nng_socket *sock = &sub->_socket;
 
-	nng_msg *msg;
-	nng_recvmsg(*sock, &msg, 0);
+	std::string msg = sub->get_message();
 
 	// unpack msg
 	GPSMessage gps_msg;
-	gps_msg.ParseFromArray(nng_msg_body(msg), nng_msg_len(msg));
+	gps_msg.ParseFromString(msg);
+
 	if (gps_msg.has_lat() && gps_msg.has_lon()) {
 		node->set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7, gps_msg.alt_msl() * 1e-3, gps_msg.alt_agl() * 1e-3);
 		//std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
 	}
-	nng_msg_free(msg);
-
 }
 
 void handle_periodic_timer(EventSource* es) {
@@ -921,10 +910,10 @@ int main(int argc, char* argv[])
 
 	EventLoop eventloop;
 
-	Replier utmsp(&node, "ipc:///tmp/utmsp.sock", handle_utmsp_update);
+	ListenerReplier utmsp(&node, SOCK_REQREP_UTMSP_COMMAND, handle_utmsp_update);
 	eventloop.add(utmsp);
 
-	Subscription gps_position(&node, "ipc:///tmp/gps_position.sock", handle_position_update);
+	Subscription gps_position(&node, SOCK_PUBSUB_GPS_POSITION, handle_position_update);
 	eventloop.add(gps_position);
 
 	Timer periodic_timer(&node, 2000, handle_periodic_timer);

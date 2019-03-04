@@ -9,15 +9,15 @@ ListenerReplier::ListenerReplier(void *node, std::string url, void (*cb)(EventSo
 	int rv;
 	// Configure reply topic for utmsp request
 	if ((rv = nng_rep0_open(&_socket)) != 0) {
-        fatal("nng_rep0_open", rv);
+		fatal("[listener-replier] nng_rep0_open", rv);
 	}
 
 	if ((rv = nng_listen(_socket, _url.c_str(), NULL, NNG_FLAG_NONBLOCK))) {
-		fatal("nng_listen", rv);
+		fatal("[listener-replier] nng_listen", rv);
 	}
 
 	if ((rv = nng_getopt_int(_socket, NNG_OPT_RECVFD, &_fd))) {
-		fatal("nng_getopt", rv);
+		fatal("[listener-replier] nng_getopt", rv);
 	}
 }
 

@@ -1,4 +1,5 @@
 #include "airmap_traffic.hpp"
+#include "vutura_common/config.hpp"
 
 AirmapTraffic::AirmapTraffic() :
 	_client(std::string("ssl://") + AIRMAP_TRAFF_HOST + std::string(":") + std::to_string(AIRMAP_TRAFF_PORT), AIRMAP_DEVICE_ID),
@@ -14,7 +15,7 @@ AirmapTraffic::AirmapTraffic() :
 		std::cerr << "nng_pub0_open pub traffic: " << nng_strerror(rv) << std::endl;
 	}
 
-	if ((rv = nng_listen(_pub_traffic, "ipc:///tmp/traffic_info.sock", NULL, 0)) != 0) {
+	if ((rv = nng_listen(_pub_traffic, SOCK_PUBSUB_TRAFFIC_INFO, NULL, 0)) != 0) {
 		std::cerr << "nng_listen pub traffic: " << nng_strerror(rv) << std::endl;
 	}
 }

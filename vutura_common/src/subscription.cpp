@@ -8,28 +8,28 @@ Subscription::Subscription(void *node, std::string url, void(*cb)(EventSource *)
 	int rv;
 
 	if ((rv = nng_sub0_open(&_socket)) != 0) {
-		fatal("nng_sub0_open", rv);
+		fatal("[subscription] nng_sub0_open", rv);
 	}
 
 	if ((rv = nng_setopt(_socket, NNG_OPT_SUB_SUBSCRIBE, "", 0)) != 0) {
-		fatal("nng_setopt", rv);
+		fatal("[subscription] nng_setopt", rv);
 	}
 
 	if ((rv = nng_dial(_socket, _url.c_str(), NULL, NNG_FLAG_NONBLOCK))) {
-		fatal("nng_listen", rv);
+		fatal("[subscription] nng_dial", rv);
 	}
 
 	// Set re-connect time to 500ms, helps when starting subscriber first
 	if ((rv = nng_setopt_ms(_socket, NNG_OPT_RECONNMINT, 500)) != 0) {
-		fatal("nng_setopt_ms", rv);
+		fatal("[subscription] nng_setopt_ms", rv);
 	}
 
 	if ((rv = nng_setopt_ms(_socket, NNG_OPT_RECONNMAXT, 0)) != 0) {
-		fatal("nng_setopt_ms", rv);
+		fatal("[subscription] nng_setopt_ms", rv);
 	}
 
 	if ((rv = nng_getopt_int(_socket, NNG_OPT_RECVFD, &_fd))) {
-		fatal("nng_getopt", rv);
+		fatal("[subscription] nng_getopt", rv);
 	}
 }
 

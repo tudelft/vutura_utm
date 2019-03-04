@@ -16,40 +16,13 @@
 #include "vutura_common/event_loop.hpp"
 #include "vutura_common/udp_source.hpp"
 #include "vutura_common/timer.hpp"
-#include "vutura_common/listener_replier.hpp"
+#include "vutura_common/subscription.hpp"
 
 #include "vutura_common.pb.cc"
 
 #define BUFFER_LENGTH 2041
 
-typedef struct mavlink_node_t
-{
-	const char* name;
-	int uav_sock;
-	int timerfd;
-	struct sockaddr_in uav_addr;
-	struct sockaddr_in loc_addr;
-	uint8_t buf[BUFFER_LENGTH];
-	nng_socket sub_cmd_socket;
-	int sub_cmd_fd;
-	nng_socket pub_gps_position_socket;
-	//	int pub_gps_position_fd;
-	nng_socket pub_uav_heartbeat_socket;
-	//	int pub_uav_heartbeat_fd;
-} mavlink_node_t;
-
-void mavlink_node_timer_event(mavlink_node_t *node);
 void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg);
-
-void mavlink_node_timer_event(mavlink_node_t *node)
-{
-	// Probably want to emit a heartbeat now
-	mavlink_message_t msg;
-	mavlink_msg_heartbeat_pack(255, 200, &msg, MAV_TYPE_GCS, MAV_AUTOPILOT_GENERIC, MAV_MODE_GUIDED_ARMED, 0, MAV_STATE_ACTIVE);
-	uint16_t len = mavlink_msg_to_send_buffer(node->buf, &msg);
-	int bytes_sent = sendto(node->uav_sock, node->buf, len, 0, (struct sockaddr*)&node->uav_addr, sizeof(struct sockaddr_in));
-	//printf("[%s] sent heartbeat %d bytes\n", node->name, bytes_sent);
-}
 
 void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg)
 {
@@ -131,12 +104,11 @@ void MavlinkNode::heartbeat_timer_callback(EventSource *es) {
 
 void MavlinkNode::uav_command_callback(EventSource *es)
 {
-	ListenerReplier *rep = static_cast<ListenerReplier*>(es);
+	Subscription *rep = static_cast<Subscription*>(es);
 	MavlinkNode *node = static_cast<MavlinkNode*>(rep->_target_object);
 	std::string message = rep->get_message();
 
 	node->uav_command(message);
-	rep->send_response("OK");
 }
 
 int main(int argc, char **argv)
@@ -150,7 +122,7 @@ int main(int argc, char **argv)
 	Timer heartbeat_timer(&node, 1000, node.heartbeat_timer_callback);
 	event_loop.add(heartbeat_timer);
 
-	ListenerReplier uav_command_sub(&node, "ipc:///tmp/uav_command.sock", node.uav_command_callback);
+	Subscription uav_command_sub(&node, SOCK_PUBSUB_UAV_COMMAND, node.uav_command_callback);
 	event_loop.add(uav_command_sub);
 
 	event_loop.start();

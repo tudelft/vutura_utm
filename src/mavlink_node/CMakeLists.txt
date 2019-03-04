@@ -7,8 +7,9 @@ file(GLOB SRCS
 	"*.cpp"
 )
 
-# For protobuf includes:
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../vutura_common)
+file(GLOB PROTO_FILES
+	"proto/*.proto"
+)
 
 add_executable(${PROJECT_NAME} ${SRCS})
 

@@ -1,13 +1,14 @@
 #pragma once
+#include "vutura_common/config.hpp"
 #include "vutura_common/udp_source.hpp"
 #include "vutura_common/publisher.hpp"
 
 class MavlinkNode {
 public:
 	MavlinkNode() :
-		mavlink_comm(this, "127.0.0.1", 14557, mavlink_comm_callback),
-		gps_pub("ipc:///tmp/gps_position.sock"),
-		uav_armed_pub("ipc:///tmp/uav_armed.sock")
+		mavlink_comm(this, MAVLINK_IP, MAVLINK_PORT, mavlink_comm_callback),
+		gps_pub(SOCK_PUBSUB_GPS_POSITION),
+		uav_armed_pub(SOCK_PUBSUB_UAV_STATUS)
 	{
 
 	}
