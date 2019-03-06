@@ -3,6 +3,11 @@ project (vutura_utm CXX)
 
 set(CMAKE_PREFIX_PATH /usr/lib)
 
+# Set output paths
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+
 # Common library
 add_subdirectory(vutura_common)
 
