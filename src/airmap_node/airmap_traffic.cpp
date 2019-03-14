@@ -39,7 +39,7 @@ int AirmapTraffic::start(const std::string& flightID, const std::string& token)
 
 	std::cout << "with user:     " << _conn_opts.get_user_name() << std::endl;
 	std::cout << "with password: " << _conn_opts.get_password_str() << std::endl;
-	_sslopts.set_trust_store("/home/bart/git/paho.mqtt.c/test/tls-testing/keys/test-root-ca.crt");
+	//_sslopts.set_trust_store("/home/bart/git/paho.mqtt.c/test/tls-testing/keys/test-root-ca.crt");
 	_sslopts.set_enable_server_cert_auth(false);
 	std::cout << "verify enabled? " << (_sslopts.get_enable_server_cert_auth() ? "YES" : "NO") << std::endl;
 
