@@ -1,10 +1,10 @@
 #pragma once
 
 // Communicator
-class Communicator
+class AirmapCommunicator
 {
 public:
-	Communicator(const std::string& apiKey) {
+	AirmapCommunicator(const std::string& apiKey) {
 		m_url = "https://" AIRMAP_HOST;
 		m_headers = NULL;
 		m_headers = curl_slist_append(m_headers, ("X-API-KEY: " + apiKey).c_str());
@@ -240,7 +240,7 @@ private:
 			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postfields);
 			curl_easy_setopt(curl, CURLOPT_POST, 1L);
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Communicator::writeFunction);
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AirmapCommunicator::writeFunction);
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
 			res = curl_easy_perform(curl);
@@ -262,7 +262,7 @@ private:
 			curl_easy_setopt(curl, CURLOPT_URL, url);
 			curl_easy_setopt(curl, CURLOPT_HTTPGET, 1);
 			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Communicator::writeFunction);
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AirmapCommunicator::writeFunction);
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
 			res = curl_easy_perform(curl);

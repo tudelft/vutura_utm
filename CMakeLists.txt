@@ -14,3 +14,4 @@ add_subdirectory(vutura_common)
 
 add_subdirectory(src/mavlink_node)
 add_subdirectory(src/airmap_node)
+add_subdirectory(src/unifly_node)

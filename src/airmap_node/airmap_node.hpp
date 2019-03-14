@@ -1,6 +1,6 @@
 #pragma once
 
-#include "communicator.hpp"
+#include "airmap_communicator.hpp"
 #include "udp_sender.hpp"
 #include "encryptor.hpp"
 #include "buffer.hpp"
@@ -38,7 +38,7 @@ private:
 
 	bool has_position_data() { return _has_position_data; }
 
-	Communicator _communicator;
+	AirmapCommunicator _communicator;
 	UdpSender _udp;
 	Encryptor _crypto;
 	std::string _cipher;
