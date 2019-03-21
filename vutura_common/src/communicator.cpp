@@ -25,7 +25,7 @@ int Communicator::clear_headers()
 int Communicator::add_header(std::string key, std::string value)
 {
 	std::string header = key + ": " + value;
-	curl_slist_append(_headers, header.c_str());
+	_headers = curl_slist_append(_headers, header.c_str());
 }
 
 unsigned int Communicator::curl_post(const char *url, const curl_slist *headers, const char *postfields, std::string &response) {

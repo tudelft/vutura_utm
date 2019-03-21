@@ -11,4 +11,5 @@ public:
 
 private:
 	Communicator _comm;
+	std::string _access_token;
 };
