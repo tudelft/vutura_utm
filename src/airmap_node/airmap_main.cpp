@@ -1,6 +1,7 @@
 ﻿#include <string>
 #include <cstdint>
 #include <iostream>
+#include <fstream>
 #include <unistd.h>
 #include <poll.h>
 
@@ -25,6 +26,34 @@
 #include "airmap_traffic.hpp"
 
 #include "airmap_node.hpp"
+
+namespace airmap {
+	std::string username;
+	std::string password;
+	std::string api_key;
+	std::string client_id;
+	std::string device_id;
+} // namespace airmap
+
+int parse_config(std::string config_file)
+{
+	nlohmann::json config;
+	try {
+		std::ifstream i(config_file);
+		i >> config;
+		airmap::username  = config["username"];
+		airmap::password  = config["password"];
+		airmap::api_key   = config["api_key"];
+		airmap::client_id = config["client_id"];
+		airmap::device_id = config["device_id"];
+
+	} catch (...) {
+		std::cerr << "Failed to parse config file " << config_file << std::endl;
+		return -1;
+	}
+	std::cout << config.dump(4) << std::endl;
+	return 0;
+}
 
 void handle_utmsp_update(EventSource* es)
 {
@@ -101,6 +130,19 @@ int main(int argc, char* argv[])
 		instance = atoi(argv[1]);
 	}
 	std::cout << "Instance " << std::to_string(instance) << std::endl;
+
+	if (argc > 2) {
+		// parse config
+		if (parse_config(argv[2]) != 0) {
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		airmap::username = AIRMAP_USERNAME;
+		airmap::password = AIRMAP_PASSWORD;
+		airmap::api_key = AIRMAP_API_KEY;
+		airmap::client_id = AIRMAP_CLIENT_ID;
+		airmap::device_id = AIRMAP_DEVICE_ID;
+	}
 
 	AirmapNode node(instance);
 	// authenticate etc

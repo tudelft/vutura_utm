@@ -3,7 +3,7 @@
 #include "vutura_common/config.hpp"
 
 AirmapTraffic::AirmapTraffic(int instance) :
-	_client(std::string("ssl://") + AIRMAP_TRAFF_HOST + std::string(":") + std::to_string(AIRMAP_TRAFF_PORT), AIRMAP_DEVICE_ID),
+	_client(std::string("ssl://") + AIRMAP_TRAFF_HOST + std::string(":") + std::to_string(AIRMAP_TRAFF_PORT), airmap::device_id),
 	_cb(nullptr)
 {
 	_conn_opts.set_keep_alive_interval(20);

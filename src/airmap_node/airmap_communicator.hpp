@@ -13,16 +13,17 @@ public:
 	}
 
 	int authenticate() {
+		std::cout << "Auth " << airmap::username << std::endl;
 		std::string url = "https://" AIRMAP_SSO_HOST "/oauth/ro";
 		std::string res;
-		char post_data[] = "grant_type=password"
-				   "&client_id=" AIRMAP_CLIENT_ID
+		std::string post_data = "grant_type=password"
+				   "&client_id=" + airmap::client_id +
 				"&connection=Username-Password-Authentication"
-				"&username=" AIRMAP_USERNAME
-				"&password=" AIRMAP_PASSWORD
+				"&username=" + airmap::username +
+				"&password=" + airmap::password +
 				"&scope=openid offline_access"
-				"&device=" AIRMAP_DEVICE_ID;
-		if (CURLE_OK != curl_post(url.c_str(), m_headers, post_data, res))
+				"&device=" + airmap::client_id;
+		if (CURLE_OK != curl_post(url.c_str(), m_headers, post_data.c_str(), res))
 			return -1;
 		// parse result to get token
 		std::cout << res << std::endl;

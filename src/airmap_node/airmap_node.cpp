@@ -29,7 +29,7 @@
 AirmapNode::AirmapNode(int instance) :
 	_autostart_flight(false),
 	_state(STATE_INIT),
-	_communicator(AIRMAP_API_KEY),
+	_communicator(airmap::api_key),
 	_udp(AIRMAP_TELEM_HOST, AIRMAP_TELEM_PORT),
 	_pub_utm_status_update(socket_name(SOCK_PUBSUB_UTM_STATUS_UPDATE, instance)),
 	_pub_uav_command(socket_name(SOCK_PUBSUB_UAV_COMMAND, instance)),

@@ -91,7 +91,7 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 	void connected(const std::string& cause) override {
 		std::cout << "\nConnection success" << std::endl;
 		std::cout << "\nSubscribing to topic '" << sa_topic << "'\n"
-			  << "\tfor client " << CLIENT_ID
+			  << "\tfor client " << airmap::client_id
 			  << " using QoS" << QOS << "\n" << std::endl;
 
 		cli_.subscribe(sa_topic, QOS, nullptr, subListener_);
