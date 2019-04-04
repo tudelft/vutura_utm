@@ -116,9 +116,17 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 		//std::cout << "\tpayload: '" << msg->to_string() << "'\n" << std::endl;
 
 		nlohmann::json j = nlohmann::json::parse(msg->to_string());
+		nlohmann::json traffic;
 
 		try {
-			nlohmann::json traffic = j["traffic"];
+			traffic = j["traffic"];
+
+		} catch (...) {
+			std::cerr << "does not contain traffic" << std::endl;
+			return;
+		}
+
+		try {
 			for (nlohmann::json::iterator it = traffic.begin(); it != traffic.end(); ++it) {
 //				std::cout << (*it).dump(4) << '\n';
 				TrafficInfo tinfo;
@@ -131,6 +139,11 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 				tinfo.set_alt(static_cast<int32_t>(std::stod( (*it)["altitude"].get<std::string>() ) * 1e3 ));
 				tinfo.set_groundspeed(static_cast<uint32_t>(std::stod( (*it)["groundspeed"].get<std::string>() ) * 1e3));
 				tinfo.set_heading(std::stoul( (*it)["true_heading"].get<std::string>() ));
+
+				if (tinfo.alt() < 80*1000) {
+					std::cout << (*it).dump(4) << std::endl;
+				}
+
 				std::string tinfo_data = tinfo.SerializeAsString();
 
 				nng_msg *nngmsg;
@@ -140,10 +153,11 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 				//std::cout << "Published traffic: " << tinfo.unique_id() << std::endl;
 			}
 			//std::cout << j["traffic"].dump(4) << std::endl;
+
 		} catch (...) {
 			std::cerr << "json parse fail: " << msg->to_string() << std::endl;
+			return;
 		}
-
 	}
 
 	void delivery_complete(mqtt::delivery_token_ptr token) override {}
