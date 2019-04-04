@@ -157,7 +157,7 @@ public:
 class AirmapTraffic
 {
 public:
-	AirmapTraffic();
+	AirmapTraffic(int instance);
 	~AirmapTraffic();
 
 	int start(const std::string &flightID, const std::string &token);

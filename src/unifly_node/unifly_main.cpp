@@ -25,7 +25,6 @@ void handle_periodic_timer(EventSource* es) {
 int main(int argc, char* argv[])
 {
 	UniflyNode node;
-	node.start();
 
 	EventLoop eventloop;
 
@@ -42,7 +41,9 @@ int main(int argc, char* argv[])
 	*/
 	Timer periodic_timer(&node, 2000, handle_periodic_timer);
 	eventloop.add(periodic_timer);
+	eventloop.add(node.gps_position_sub);
 
+	node.start();
 	eventloop.start();
 
 	return 0;

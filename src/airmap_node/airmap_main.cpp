@@ -1,4 +1,4 @@
-#include <string>
+﻿#include <string>
 #include <cstdint>
 #include <iostream>
 #include <unistd.h>
@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 
 #include "airmap_config.h"
+#include "vutura_common/helper.hpp"
 #include "vutura_common/config.hpp"
 #include "vutura_common/vutura_common.pb.h"
 #include "vutura_common/listener_replier.hpp"
@@ -95,20 +96,26 @@ void handle_periodic_timer(EventSource* es) {
 // main
 int main(int argc, char* argv[])
 {
-	AirmapNode node;
+	int instance = 0;
+	if (argc > 1) {
+		instance = atoi(argv[1]);
+	}
+	std::cout << "Instance " << std::to_string(instance) << std::endl;
+
+	AirmapNode node(instance);
 	// authenticate etc
 	node.start();
 	//	node.set_position(52.170365387094016, 4.4171905517578125, 10, 10);
 
 	EventLoop eventloop;
 
-	ListenerReplier utmsp(&node, SOCK_REQREP_UTMSP_COMMAND, handle_utmsp_update);
+	ListenerReplier utmsp(&node, socket_name(SOCK_REQREP_UTMSP_COMMAND, instance), handle_utmsp_update);
 	eventloop.add(utmsp);
 
-	Subscription gps_position(&node, SOCK_PUBSUB_GPS_POSITION, handle_position_update);
+	Subscription gps_position(&node, socket_name(SOCK_PUBSUB_GPS_POSITION, instance), handle_position_update);
 	eventloop.add(gps_position);
 
-	Subscription uav_hb(&node, SOCK_PUBSUB_UAV_STATUS, handle_uav_hb);
+	Subscription uav_hb(&node, socket_name(SOCK_PUBSUB_UAV_STATUS, instance), handle_uav_hb);
 	eventloop.add(uav_hb);
 
 	Timer periodic_timer(&node, 2000, handle_periodic_timer);

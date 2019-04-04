@@ -13,6 +13,7 @@
 #include "mavlink_node.h"
 #include <mavlink.h>
 
+#include "vutura_common/helper.hpp"
 #include "vutura_common/event_loop.hpp"
 #include "vutura_common/udp_source.hpp"
 #include "vutura_common/timer.hpp"
@@ -130,16 +131,21 @@ void MavlinkNode::uav_command_callback(EventSource *es)
 
 int main(int argc, char **argv)
 {
+	int instance = 0;
+	if (argc > 1) {
+		instance = atoi(argv[1]);
+	}
+	std::cout << "Instance " << std::to_string(instance) << std::endl;
 
 	EventLoop event_loop;
 
-	MavlinkNode node;
+	MavlinkNode node(instance);
 	event_loop.add(node.mavlink_comm);
 
 	Timer heartbeat_timer(&node, 1000, node.heartbeat_timer_callback);
 	event_loop.add(heartbeat_timer);
 
-	Subscription uav_command_sub(&node, SOCK_PUBSUB_UAV_COMMAND, node.uav_command_callback);
+	Subscription uav_command_sub(&node, socket_name(SOCK_PUBSUB_UAV_COMMAND, instance), node.uav_command_callback);
 	event_loop.add(uav_command_sub);
 
 	event_loop.start();

@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 
 #include "airmap_config.h"
+#include "vutura_common/helper.hpp"
 #include "vutura_common/config.hpp"
 #include "vutura_common/vutura_common.pb.h"
 #include "vutura_common/listener_replier.hpp"
@@ -25,13 +26,14 @@
 
 #include "airmap_node.hpp"
 
-AirmapNode::AirmapNode() :
+AirmapNode::AirmapNode(int instance) :
 	_autostart_flight(false),
 	_state(STATE_INIT),
 	_communicator(AIRMAP_API_KEY),
 	_udp(AIRMAP_TELEM_HOST, AIRMAP_TELEM_PORT),
-	_pub_utm_status_update(SOCK_PUBSUB_UTM_STATUS_UPDATE),
-	_pub_uav_command(SOCK_PUBSUB_UAV_COMMAND),
+	_pub_utm_status_update(socket_name(SOCK_PUBSUB_UTM_STATUS_UPDATE, instance)),
+	_pub_uav_command(socket_name(SOCK_PUBSUB_UAV_COMMAND, instance)),
+	_traffic(instance),
 	_encryptionType(1),
 	_comms_counter(1),
 	_iv(16, 0),

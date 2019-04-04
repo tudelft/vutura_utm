@@ -17,7 +17,7 @@ public:
 		STATE_FLIGHT_STARTED
 	};
 
-	AirmapNode();
+	AirmapNode(int instance);
 
 	void update_state(AirmapState new_state);
 	int start();
