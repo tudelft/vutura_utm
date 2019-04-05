@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include "airmap_config.h"
+#include "vutura_common/cxxopts.hpp"
 #include "vutura_common/helper.hpp"
 #include "vutura_common/config.hpp"
 #include "vutura_common/vutura_common.pb.h"
@@ -126,28 +127,73 @@ void handle_periodic_timer(EventSource* es) {
 int main(int argc, char* argv[])
 {
 	int instance = 0;
-	if (argc > 1) {
-		instance = atoi(argv[1]);
+	std::string config_file = "";
+	std::string geometry_file = "";
+
+	try
+	{
+		cxxopts::Options options(argv[0], " - Airmap Vutura node");
+		options
+				.positional_help("[optional args]")
+				.show_positional_help();
+
+		options
+				.add_options()
+				("i,instance", "Instance number, used for running multiple instances", cxxopts::value<int>(instance), "N")
+				("c,config", "Airmap configuration file", cxxopts::value<std::string>(config_file), "FILE")
+				("g,geometry", "GeoJSON Geometry file", cxxopts::value<std::string>(geometry_file), "FILE")
+				("help", "Print help")
+				;
+
+		auto result = options.parse(argc, argv);
+
+		if (result.count("help"))
+		{
+			std::cout << options.help() << std::endl;
+			exit(0);
+		}
+
+		if (result.count("c")) {
+
+			// parse config
+			std::cout << "Using config file: " << config_file << std::endl;
+			if (parse_config(config_file.c_str()) != 0) {
+				exit(EXIT_FAILURE);
+			}
+		} else {
+			airmap::username = AIRMAP_USERNAME;
+			airmap::password = AIRMAP_PASSWORD;
+			airmap::api_key = AIRMAP_API_KEY;
+			airmap::client_id = AIRMAP_CLIENT_ID;
+			airmap::device_id = AIRMAP_DEVICE_ID;
+		}
+
+	} catch (const cxxopts::OptionException& e)
+	{
+		std::cout << "error parsing options: " << e.what() << std::endl;
+		exit(1);
 	}
+
 	std::cout << "Instance " << std::to_string(instance) << std::endl;
 
-	if (argc > 2) {
-		// parse config
-		if (parse_config(argv[2]) != 0) {
-			exit(EXIT_FAILURE);
+	AirmapNode node(instance);
+
+	// parse geofence file
+	if (geometry_file != "") {
+		try {
+			nlohmann::json geometry;
+			std::ifstream i(geometry_file);
+			i >> geometry;
+			std::cout << geometry.dump(4) << std::endl;
+			node.set_geometry(geometry);
+		} catch (...) {
+			std::cerr << "Error parsing geofence file" << std::endl;
 		}
-	} else {
-		airmap::username = AIRMAP_USERNAME;
-		airmap::password = AIRMAP_PASSWORD;
-		airmap::api_key = AIRMAP_API_KEY;
-		airmap::client_id = AIRMAP_CLIENT_ID;
-		airmap::device_id = AIRMAP_DEVICE_ID;
 	}
 
-	AirmapNode node(instance);
+
 	// authenticate etc
 	node.start();
-	//	node.set_position(52.170365387094016, 4.4171905517578125, 10, 10);
 
 	EventLoop eventloop;
 

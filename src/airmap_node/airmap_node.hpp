@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
 #include "airmap_communicator.hpp"
 #include "udp_sender.hpp"
 #include "encryptor.hpp"
@@ -29,6 +30,7 @@ public:
 	int set_position(float latitude, float longitude, float alt_msl, float alt_agl);
 	std::uint64_t getTimeStamp();
 	int set_armed(bool armed);
+	int set_geometry(nlohmann::json geofence);
 
 	bool _autostart_flight;
 
@@ -62,5 +64,7 @@ private:
 	double _lon;
 	double _alt_msl;
 	double _alt_agl;
+
+	nlohmann::json _geometry;
 };
 

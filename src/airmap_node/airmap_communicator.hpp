@@ -22,7 +22,7 @@ public:
 				"&username=" + airmap::username +
 				"&password=" + airmap::password +
 				"&scope=openid offline_access"
-				"&device=" + airmap::client_id;
+				"&device=" + airmap::device_id;
 		if (CURLE_OK != curl_post(url.c_str(), m_headers, post_data.c_str(), res))
 			return -1;
 		// parse result to get token
@@ -57,7 +57,7 @@ public:
 		}
 	}
 
-	int create_flightplan(const float latitude, const float longitude, const std::string& pilotID, std::string& flightplanID) {
+	int create_flightplan(const float latitude, const float longitude, const nlohmann::json geometry, const std::string& pilotID, std::string& flightplanID) {
 		std::string url = m_url + "/flight/v2/plan";
 
 		time_t current_time;
@@ -69,109 +69,6 @@ public:
 		char end[21];
 		strftime(end, 21, "%FT%TZ", gmtime(&land_time));
 
-		nlohmann::json geometry;
-		geometry["type"] = "Polygon";
-		geometry["coordinates"] = nlohmann::json::array({{
-									{4.415044784545898,
-									 52.17101023840795
-								       },
-								       {
-									 4.415087699890137,
-									 52.16679879572676
-								       },
-								       {
-									 4.415860176086426,
-									 52.166772472956495
-								       },
-								       {
-									 4.415946006774902,
-									 52.16872031589736
-								       },
-								       {
-									 4.418177604675293,
-									 52.16861502926976
-								       },
-								       {
-									 4.417705535888672,
-									 52.16669350455227
-								       },
-								       {
-									 4.418907165527344,
-									 52.16661453600787
-								       },
-								       {
-									 4.419207572937012,
-									 52.16835181161079
-								       },
-								       {
-									 4.420409202575684,
-									 52.16658821312859
-								       },
-								       {
-									 4.422554969787598,
-									 52.16650924439736
-								       },
-								       {
-									 4.424271583557129,
-									 52.16840445526715
-								       },
-								       {
-									 4.4241857528686515,
-									 52.166482921455795
-								       },
-								       {
-									 4.425473213195801,
-									 52.16643027552595
-								       },
-								       {
-									 4.425473213195801,
-									 52.171220800078025
-								       },
-								       {
-									 4.424014091491699,
-									 52.17119447992377
-								       },
-								       {
-									 4.423928260803223,
-									 52.16935203043088
-								       },
-								       {
-									 4.422554969787598,
-									 52.17095759783472
-								       },
-								       {
-									 4.420838356018066,
-									 52.170983918129124
-								       },
-								       {
-									 4.419207572937012,
-									 52.169299387895656
-								       },
-								       {
-									 4.419121742248535,
-									 52.1709049571992
-								       },
-								       {
-									 4.418048858642578,
-									 52.17095759783472
-								       },
-								       {
-									 4.417877197265625,
-									 52.169220423976036
-								       },
-								       {
-									 4.416074752807617,
-									 52.16935203043088
-								       },
-								       {
-									 4.416203498840332,
-									 52.170983918129124
-								       },
-								       {
-									 4.415044784545898,
-									 52.17101023840795}
-								}});
-
 		nlohmann::json request = {
 			{"pilot_id", pilotID},
 			{"start_time", now},
@@ -180,15 +77,17 @@ public:
 			{"max_altitude_agl", 120},
 			{"takeoff_latitude", latitude},
 			{"takeoff_longitude", longitude},
-			{"rulesets", {"custom_z5d341_drone_rules"}}/*,
-			{"geometry", {
-				 {"type", "Point"},
-				 {"coordinates", {
-					  longitude, latitude
-				  }}
-			 }}*/
+			{"rulesets", {"custom_z5d341_drone_rules"}}
 		};
-		request["geometry"] = geometry;
+
+		if (geometry == nullptr) {
+			nlohmann::json geom;
+			geom["type"] = "Point";
+			geom["coordinates"] = {longitude, latitude};
+			request["geometry"] = geom;
+		} else {
+			request["geometry"] = geometry;
+		}
 
 		std::cout << request.dump(4) << std::endl;
 

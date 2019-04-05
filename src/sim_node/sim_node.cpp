@@ -23,16 +23,16 @@ int SimNode::handle_periodic_timer()
 		_angle = 0.0;
 	}
 
-	float lon = 4.4194865226745605 + 0.002 * std::cos(_angle);
-	float lat = 52.17006269856014 + 0.002 * std::sin(_angle);
+	float lon = 4.4194865226745605 + 0.003 * std::cos(_angle);
+	float lat = 52.17006269856014 + 0.003 * std::sin(_angle);
 
 	GPSMessage gps_message;
 	uint16_t len;
 	gps_message.set_timestamp(0);
 	gps_message.set_lat(lat*1e7);
 	gps_message.set_lon(lon*1e7);
-	gps_message.set_alt_msl(50000);
-	gps_message.set_alt_agl(50000);
+	gps_message.set_alt_msl(10000);
+	gps_message.set_alt_agl(10000);
 
 	gps_pub.publish(gps_message.SerializeAsString());
 

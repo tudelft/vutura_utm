@@ -41,7 +41,8 @@ AirmapNode::AirmapNode(int instance) :
 	_lat(0),
 	_lon(0),
 	_alt_msl(0),
-	_alt_agl(0)
+	_alt_agl(0),
+	_geometry(nullptr)
 {
 
 }
@@ -110,7 +111,7 @@ int AirmapNode::request_flight() {
 		return -1;
 	}
 
-	if (-1 == _communicator.create_flightplan(_lat, _lon, _pilotID, _flightplanID)) {
+	if (-1 == _communicator.create_flightplan(_lat, _lon, _geometry, _pilotID, _flightplanID)) {
 		std::cout << "Flight Creation Failed!" << std::endl;
 		return -1;
 	}
@@ -162,6 +163,11 @@ int AirmapNode::set_armed(bool armed)
 			end_flight();
 		}
 	}
+}
+
+int AirmapNode::set_geometry(nlohmann::json geometry)
+{
+	_geometry = geometry;
 }
 
 int AirmapNode::get_brief() {
