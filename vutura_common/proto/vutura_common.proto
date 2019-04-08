@@ -20,6 +20,13 @@ message TrafficInfo {
   required uint32 heading = 9;
 }
 
+message AvoidanceVelocity {
+  required bool avoid = 1;
+  required sint32 vx = 2;
+  required sint32 vy = 3;
+  required sint32 vz = 4;
+}
+
 message UavHeartbeat {
   optional bool armed = 1;
 }

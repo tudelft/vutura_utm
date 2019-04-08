@@ -18,6 +18,7 @@
 #include "vutura_common/udp_source.hpp"
 #include "vutura_common/timer.hpp"
 #include "vutura_common/subscription.hpp"
+#include "vutura_common/listener_replier.hpp"
 
 #include "vutura_common.pb.cc"
 
@@ -54,7 +55,6 @@ void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg)
 	}
 }
 
-
 void MavlinkNode::uav_command(std::string command)
 {
 	if (command == "start mission") {
@@ -79,6 +79,47 @@ void MavlinkNode::emit_heartbeat()
 	//printf("[%s] sent heartbeat %d bytes\n", node->name, bytes_sent);
 }
 
+void MavlinkNode::avoidance_velocity_vector(bool avoid, float vx, float vy, float vz)
+{
+	// Disable avoidance mode
+	if (_avoiding != avoid && !avoid) {
+		enable_offboard(false);
+		_avoiding = avoid;
+		return;
+	}
+
+	// Also try sending a command to use in offboard mode
+	mavlink_set_position_target_local_ned_t offboard_target;
+	offboard_target.time_boot_ms = 0;
+	offboard_target.target_component = 1;
+	offboard_target.target_system = 1;
+	offboard_target.coordinate_frame = MAV_FRAME_LOCAL_NED;
+	offboard_target.type_mask =
+			POSITION_TARGET_TYPEMASK_X_IGNORE |
+			POSITION_TARGET_TYPEMASK_Y_IGNORE |
+			POSITION_TARGET_TYPEMASK_Z_IGNORE |
+			POSITION_TARGET_TYPEMASK_AX_IGNORE |
+			POSITION_TARGET_TYPEMASK_AY_IGNORE |
+			POSITION_TARGET_TYPEMASK_AZ_IGNORE |
+			POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE;
+	offboard_target.vx = vx;
+	offboard_target.vy = vy;
+	offboard_target.vz = vz;
+	offboard_target.yaw = std::atan2(offboard_target.vy, offboard_target.vx);
+
+	mavlink_message_t msg;
+	mavlink_msg_set_position_target_local_ned_encode(255, 200, &msg, &offboard_target);
+	uint16_t len = mavlink_msg_to_send_buffer(mavlink_comm.buf, &msg);
+	mavlink_comm.send_buffer(len);
+
+	// Enable avoidance mode
+	if (_avoiding != avoid && avoid) {
+		enable_offboard(true);
+		_avoiding = avoid;
+	}
+
+}
+
 void MavlinkNode::set_armed_state(bool armed)
 {
 	if (armed != _armed) {
@@ -90,6 +131,28 @@ void MavlinkNode::set_armed_state(bool armed)
 		uav_armed_pub.publish(uavhb.SerializeAsString());
 
 	}
+}
+
+void MavlinkNode::enable_offboard(bool offboard)
+{
+	mavlink_message_t msg;
+	mavlink_command_long_t command_msg;
+	command_msg.target_system = 1;
+	command_msg.target_component = 1;
+	command_msg.command = MAV_CMD_NAV_GUIDED_ENABLE;
+
+	if (offboard) {
+		// mavlink command to enable offboard
+		command_msg.param1 = 1;
+	} else {
+		command_msg.param1 = 0;
+	}
+
+	std::cout << "Sending offboard mode " << std::to_string(command_msg.param1) << std::endl;
+
+	mavlink_msg_command_long_encode(255, 200, &msg, &command_msg);
+	uint16_t len = mavlink_msg_to_send_buffer(mavlink_comm.buf, &msg);
+	mavlink_comm.send_buffer(len);
 }
 
 void MavlinkNode::mavlink_comm_callback(EventSource *es) {
@@ -129,6 +192,36 @@ void MavlinkNode::uav_command_callback(EventSource *es)
 	node->uav_command(message);
 }
 
+void MavlinkNode::avoidance_command_callback(EventSource *es)
+{
+	ListenerReplier *rep = static_cast<ListenerReplier*>(es);
+	MavlinkNode *node = static_cast<MavlinkNode*>(rep->_target_object);
+	std::string message = rep->get_message();
+
+	// Assume that this was an avoidance velocity message
+	AvoidanceVelocity avoidance_msg;
+	std::string response = "OK";
+	try {
+		bool success = avoidance_msg.ParseFromString(message);
+		if (!success) {
+			response = "NOTOK";
+		} else {
+//			std::cout << "vx: " << std::to_string(avoidance_msg.vx()) << std::endl;
+//			std::cout << "vy: " << std::to_string(avoidance_msg.vy()) << std::endl;
+//			std::cout << "vz: " << std::to_string(avoidance_msg.vz()) << std::endl;
+		}
+	} catch (...) {
+		std::cerr << "Error parsing avoidance command" << std::endl;
+		response = "NOTOK";
+	}
+
+	rep->send_response(response);
+
+	// do something with it
+	node->avoidance_velocity_vector(avoidance_msg.avoid(), 0.001 * avoidance_msg.vx(), 0.001 * avoidance_msg.vy(), 0.001 * avoidance_msg.vz());
+
+}
+
 int main(int argc, char **argv)
 {
 	int instance = 0;
@@ -147,6 +240,9 @@ int main(int argc, char **argv)
 
 	Subscription uav_command_sub(&node, socket_name(SOCK_PUBSUB_UAV_COMMAND, instance), node.uav_command_callback);
 	event_loop.add(uav_command_sub);
+
+	ListenerReplier avoidance_rep(&node, socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance), node.avoidance_command_callback);
+	event_loop.add(avoidance_rep);
 
 	event_loop.start();
 }
