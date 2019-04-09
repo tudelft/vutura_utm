@@ -4,7 +4,7 @@
 #include "vutura_common/event_loop.hpp"
 #include "vutura_common/timer.hpp"
 
-#include "vutura_common.pb.cc"
+#include "vutura_common.pb.h"
 
 #include "sim_node.hpp"
 

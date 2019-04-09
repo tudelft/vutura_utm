@@ -20,7 +20,7 @@
 #include "vutura_common/subscription.hpp"
 #include "vutura_common/listener_replier.hpp"
 
-#include "vutura_common.pb.cc"
+#include "vutura_common.pb.h"
 
 #define BUFFER_LENGTH 2041
 
