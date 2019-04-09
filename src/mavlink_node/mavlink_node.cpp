@@ -52,6 +52,7 @@ void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg)
 		mavlink_msg_heartbeat_decode(msg, &hb);
 
 		node->set_armed_state(hb.system_status == MAV_STATE_ACTIVE);
+		node->set_guided_state(hb.base_mode & MAV_MODE_FLAG_GUIDED_ENABLED);
 	}
 }
 
@@ -112,10 +113,12 @@ void MavlinkNode::avoidance_velocity_vector(bool avoid, float vx, float vy, floa
 	uint16_t len = mavlink_msg_to_send_buffer(mavlink_comm.buf, &msg);
 	mavlink_comm.send_buffer(len);
 
-	// Enable avoidance mode
-	if (_avoiding != avoid && avoid) {
-		enable_offboard(true);
-		_avoiding = avoid;
+	// Enable avoidance mode, only allowed during missions (guided mode)
+	if (_guided_mode) {
+		if (_avoiding != avoid && avoid) {
+			enable_offboard(true);
+			_avoiding = avoid;
+		}
 	}
 
 }
@@ -131,6 +134,16 @@ void MavlinkNode::set_armed_state(bool armed)
 		uav_armed_pub.publish(uavhb.SerializeAsString());
 
 	}
+}
+
+void MavlinkNode::set_guided_state(bool guided_mode_enabled)
+{
+	_guided_mode = guided_mode_enabled;
+//	if (_guided_mode) {
+//		std::cout << "GUIDED" << std::endl;
+//	} else {
+//		std::cout << "Not guided" << std::endl;
+//	}
 }
 
 void MavlinkNode::enable_offboard(bool offboard)

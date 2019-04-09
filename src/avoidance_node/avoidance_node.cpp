@@ -50,17 +50,17 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
 	double x,y,dist;
 	get_relative_coordinates(_lat, _lon, lat_i, lon_i, &x, &y);
 	dist = sqrt(x * x + y * y);
-	std::cout << "Traffic: " << std::to_string(x) << ", " << std::to_string(y) << "\tdist: " << dist << std::endl;
+	std::cout << "Traffic: " << std::to_string(x) << ", " << std::to_string(y) << "\tdist: " << dist << "\talt: " << alt_i << std::endl;
 
 	// Worst avoidance algorithm in the world:
-	_vx_sp = x/dist * 3;
-	_vy_sp = y/dist * 3;
-	_vz_sp = 0;
-
 	if (alt_i < 100 && dist < 500) {
+		_vx_sp = x/dist * 6;
+		_vy_sp = y/dist * 6;
+		_vz_sp = 0;
+
 		_avoid = true;
 	} else {
-		_avoid = false;
+//		_avoid = false;
 	}
 }
 

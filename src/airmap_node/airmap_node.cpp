@@ -85,6 +85,7 @@ void AirmapNode::update_state(AirmapNode::AirmapState new_state) {
 int AirmapNode::start() {
 	if (-1 == _communicator.authenticate()) {
 		std::cout << "Authentication Failed!" << std::endl;
+		exit(EXIT_FAILURE);
 		return -1;
 	}
 

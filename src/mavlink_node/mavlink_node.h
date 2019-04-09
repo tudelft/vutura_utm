@@ -11,6 +11,7 @@ public:
 		gps_pub(socket_name(SOCK_PUBSUB_GPS_POSITION, instance)),
 		uav_armed_pub(socket_name(SOCK_PUBSUB_UAV_STATUS, instance)),
 		_armed(false),
+		_guided_mode(false),
 		_avoiding(false)
 	{
 
@@ -20,6 +21,7 @@ public:
 	void emit_heartbeat();
 	void avoidance_velocity_vector(bool avoid, float vx, float vy, float vz);
 	void set_armed_state(bool armed);
+	void set_guided_state(bool guided_mode_enabled);
 	void enable_offboard(bool offboard);
 
 	UdpSource mavlink_comm;
@@ -34,5 +36,6 @@ public:
 
 private:
 	bool _armed;
+	bool _guided_mode;
 	bool _avoiding;
 };

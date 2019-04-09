@@ -24,7 +24,7 @@ int SimNode::handle_periodic_timer()
 	}
 
 	float lon = 4.4194865226745605 + 0.003 * std::cos(_angle);
-	float lat = 52.17006269856014 + 0.003 * std::sin(_angle);
+	float lat = 52.17006269856014 + 0.002 * std::sin(_angle);
 
 	GPSMessage gps_message;
 	uint16_t len;
