@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 
 #define AIRMAP_HOST "api.airmap.com"
 
@@ -16,3 +17,11 @@
 #define AIRMAP_DEVICE_ID ""
 #define AIRMAP_USERNAME ""
 #define AIRMAP_PASSWORD ""
+
+namespace airmap {
+	extern std::string username;
+	extern std::string password;
+	extern std::string api_key;
+	extern std::string client_id;
+	extern std::string device_id;
+} // namespace airmap
