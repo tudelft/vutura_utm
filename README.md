@@ -49,3 +49,21 @@ mkdir build && cd build
 cmake ..
 make
 ```
+
+## Run instructions
+
+Before running airmap_node, create a configuration file (for example airmap_config.json)
+```
+{
+    "username" : "",
+    "password" : "",
+    "api_key": "",
+    "client_id": "",
+    "device_id": ""
+}
+```
+
+Then, call airmap_node like this:
+```
+./airmap_node -c /path/to/airmap_config.json
+```
