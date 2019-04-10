@@ -41,6 +41,10 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
 	double lon_i = traffic.lon() * 1e-7;
 	double alt_i = traffic.alt() * 1e-3;
 
+	if(alt_i > 120) {
+		return 0;
+	}
+
 	if (!_gps_position_valid) {
 		std::cerr << "Unknown position of self" << std::endl;
 		return -1;
@@ -53,14 +57,14 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
 	std::cout << "Traffic: " << std::to_string(x) << ", " << std::to_string(y) << "\tdist: " << dist << "\talt: " << alt_i << std::endl;
 
 	// Worst avoidance algorithm in the world:
-	if (alt_i < 100 && dist < 500) {
+	if (alt_i < 120 && dist < 2000) {
 		_vx_sp = x/dist * 6;
 		_vy_sp = y/dist * 6;
 		_vz_sp = 0;
 
 		_avoid = true;
 	} else {
-//		_avoid = false;
+		//_avoid = false;
 	}
 }
 
