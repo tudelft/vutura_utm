@@ -20,8 +20,10 @@ UniflyNode::UniflyNode(int instance) :
 	_takeoff(false)
 {
 	// hard-coded for now, can also be requested through the api
-	_uas_uuid = "e6755d9f-1b83-4993-a121-aaeab695996a";
-	_user_uuid = "e01c6f69-6107-456b-9031-6adc68afd24b";
+//	_uas_uuid = "e6755d9f-1b83-4993-a121-aaeab695996a"; // vutura
+//	_user_uuid = "e01c6f69-6107-456b-9031-6adc68afd24b"; // vutura
+	_uas_uuid = "897f53b7-61f0-4bd8-b1c4-9bc9a98d64b4"; // parrot disco in podium
+	_user_uuid = "67f8413e-10a4-48bf-9948-c3d2d532cdee"; // podium
 }
 
 int UniflyNode::start()
@@ -50,7 +52,7 @@ int UniflyNode::start()
 //	get_user_id();
 //	return 0;
 	request_flight();
-	sleep(2); // beun, validation
+//	sleep(2); // beun, validation
 	get_validation_results();
 	get_action_items();
 
@@ -72,7 +74,7 @@ int UniflyNode::request_flight()
 	nlohmann::json request;
 
 	// parse geofence file
-	std::string geometry_file = "/home/bart/unifly/geo_delft.json";
+	std::string geometry_file = "/home/bart/unifly/geo_bressonvilliers.json";
 	nlohmann::json geometry;
 	if (geometry_file != "") {
 		try {
@@ -162,26 +164,35 @@ int UniflyNode::get_user_id()
 
 int UniflyNode::get_validation_results()
 {
-	_comm.clear_headers();
-	_comm.add_header("authorization", "Bearer " + _access_token);
-	_comm.add_header("content-type", "application/json");
+	while (true) {
+		_comm.clear_headers();
+		_comm.add_header("authorization", "Bearer " + _access_token);
+		_comm.add_header("content-type", "application/json");
 
-	if (_operation_unique_identifier == "") {
-		std::cerr << "Unique Identifier for operation not set" << std::endl;
-	}
+		if (_operation_unique_identifier == "") {
+			std::cerr << "Unique Identifier for operation not set" << std::endl;
+		}
 
-	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/validationresults";
+		std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/validationresults";
 
 
-	std::string res;
-	_comm.get(url.c_str(), res);
+		std::string res;
+		_comm.get(url.c_str(), res);
 
-	nlohmann::json result;
-	try {
-		result = nlohmann::json::parse(res);
-		std::cout << result.dump(4) << std::endl;
+		nlohmann::json result;
+		try {
+			result = nlohmann::json::parse(res);
+			std::cout << result.dump(4) << std::endl;
 
-	} catch (...) {
+		} catch (...) {
+		}
+
+		if (result.dump() != "[]") {
+			break;
+		} else {
+			std::cout << "pending..." << std::endl;
+			sleep(1);
+		}
 	}
 
 }
@@ -211,6 +222,51 @@ int UniflyNode::get_action_items()
 	}
 
 	std::cout << result.dump(4) << std::endl;
+
+	// request permission for action items
+
+	for (nlohmann::json::iterator it = result.begin(); it != result.end(); ++it) {
+	  std::cout << *it << '\n';
+	  std::string permission_uuid = (*it)["uniqueIdentifier"].get<std::string>();
+	  std::cout << "DIT IS DE PERMISSION ID: " << permission_uuid << std::endl;
+	  get_permission(permission_uuid);
+	}
+
+}
+
+int UniflyNode::get_permission(std::string uuid)
+{
+
+	_comm.clear_headers();
+	_comm.add_header("authorization", "Bearer " + _access_token);
+	_comm.add_header("content-type", "multipart/form-data");
+
+	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/permissions/" + uuid + "/request";
+
+	time_t current_time;
+	time(&current_time);
+	char now[21];
+	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
+
+	nlohmann::json permission;
+	permission["uniqueIdentifier"] = uuid;
+	permission["permissionRemark"]["message"]["timestamp"] = now;
+
+
+	std::string postfields = permission.dump();
+
+	std::cout << "Permission Request: " << permission.dump(4) << std::endl;
+
+	std::string res;
+	_comm.multipart_post(url.c_str(), postfields.c_str(), res);
+
+	try {
+		nlohmann::json result = nlohmann::json::parse(res);
+		std::cout << "Permission request result: " << std::endl;
+		std::cout << result.dump(4) << std::endl;
+	} catch (...) {
+		std::cout << "Could not parse response" << std::endl;
+	}
 }
 
 int UniflyNode::send_tracking_position()
@@ -267,6 +323,7 @@ int UniflyNode::send_tracking_position()
 
 int UniflyNode::send_takeoff()
 {
+
 	_comm.clear_headers();
 	_comm.add_header("authorization", "Bearer " + _access_token);
 	_comm.add_header("content-type", "application/json");

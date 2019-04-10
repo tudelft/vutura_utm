@@ -9,6 +9,7 @@ public:
 	Communicator();
 
 	unsigned int post(const char* url, const char* postfields, std::string& response);
+	unsigned int multipart_post(const char* url, const char* postfields, std::string& response);
 	unsigned int get(const char* url, std::string& response);
 	int clear_headers();
 	int add_header(std::string key, std::string value);
@@ -20,6 +21,7 @@ private:
 	}
 
 	unsigned int curl_post(const char* url, const struct curl_slist* headers, const char* postfields, std::string& response);
+	unsigned int curl_multipart_post(const char* url, const struct curl_slist* headers, const char* postfields, std::string& response);
 	unsigned int curl_get(const char* url, const struct curl_slist* headers, std::string& response);
 
 	struct curl_slist *_headers;

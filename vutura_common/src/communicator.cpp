@@ -11,6 +11,11 @@ unsigned int Communicator::post(const char *url, const char *postfields, std::st
 	return curl_post(url, _headers, postfields, response);
 }
 
+unsigned int Communicator::multipart_post(const char *url, const char *postfields, std::string &response)
+{
+	return curl_multipart_post(url, _headers, postfields, response);
+}
+
 unsigned int Communicator::get(const char *url, std::string &response) {
 	return curl_get(url, _headers, response);
 }
@@ -50,6 +55,38 @@ unsigned int Communicator::curl_post(const char *url, const curl_slist *headers,
 
 	return res;
 }
+
+unsigned int Communicator::curl_multipart_post(const char *url, const curl_slist *headers, const char *postfields, std::string &response)
+{
+	CURLcode res = CURLE_FAILED_INIT;
+	CURL *curl = curl_easy_init();
+
+	struct curl_httppost* post = NULL;
+	struct curl_httppost* last = NULL;
+
+	curl_formadd(&post, &last,
+		     CURLFORM_COPYNAME, "meta",
+		     CURLFORM_COPYCONTENTS, postfields,
+		     CURLFORM_CONTENTTYPE, "application/json",
+		     CURLFORM_END);
+
+	if (curl) {
+		curl_easy_setopt(curl, CURLOPT_URL, url);
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+		curl_easy_setopt(curl, CURLOPT_HTTPPOST, post);
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Communicator::writeFunction);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+
+		res = curl_easy_perform(curl);
+		if (res != CURLE_OK) {
+			fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+		}
+
+		curl_easy_cleanup(curl);
+	}
+}
+
+
 
 unsigned int Communicator::curl_get(const char *url, const curl_slist *headers, std::string &response) {
 	CURLcode res = CURLE_FAILED_INIT;
