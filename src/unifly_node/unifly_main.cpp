@@ -26,13 +26,13 @@ void handle_periodic_timer(EventSource* es) {
 	ssize_t recv_size = read(es->_fd, &num_timer_events, 8);
 	(void) recv_size;
 
-	//node->periodic();
+	node->periodic();
 }
 
 // main
 int main(int argc, char* argv[])
 {
-	UniflyNode node;
+	UniflyNode node(0);
 
 	EventLoop eventloop;
 
@@ -47,8 +47,9 @@ int main(int argc, char* argv[])
 	eventloop.add(uav_hb);
 
 	*/
-	Timer periodic_timer(&node, 2000, handle_periodic_timer);
-	eventloop.add(periodic_timer);
+//	Timer periodic_timer(&node, 2000, handle_periodic_timer);
+//	eventloop.add(periodic_timer);
+
 	eventloop.add(node.gps_position_sub);
 
 	node.start();

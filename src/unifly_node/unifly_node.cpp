@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <unistd.h>
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
@@ -8,15 +9,17 @@
 #include "unifly_node.hpp"
 
 
-UniflyNode::UniflyNode() :
-	gps_position_sub(this, SOCK_PUBSUB_GPS_POSITION, position_update_callback),
+UniflyNode::UniflyNode(int instance) :
+	gps_position_sub(this, socket_name(SOCK_PUBSUB_GPS_POSITION, instance), position_update_callback),
 	_lat(0.0),
 	_lon(0.0),
 	_alt_msl(0.0),
 	_alt_agl(0.0),
 	_has_position_data(false)
 {
-
+	// hard-coded for now, can also be requested through the api
+	_uas_uuid = "e6755d9f-1b83-4993-a121-aaeab695996a";
+	_user_uuid = "e01c6f69-6107-456b-9031-6adc68afd24b";
 }
 
 int UniflyNode::start()
@@ -42,7 +45,10 @@ int UniflyNode::start()
 		return -1;
 	}
 
+	get_user_id();
 	request_flight();
+	sleep(2); // beun, validation
+	get_validation_results();
 	get_action_items();
 
 	return 0;
@@ -63,14 +69,14 @@ int UniflyNode::request_flight()
 	nlohmann::json request;
 
 	// parse geofence file
-	std::string geometry_file = "/home/bart/airmap/geo_hoi.json";
+	std::string geometry_file = "/home/bart/unifly/geo_delft.json";
 	nlohmann::json geometry;
 	if (geometry_file != "") {
 		try {
 			nlohmann::json geometry;
 			std::ifstream i(geometry_file);
 			i >> geometry;
-			//std::cout << geometry.dump(4) << std::endl;
+//			std::cout << geometry.dump(4) << std::endl;
 			request["geometry"] = geometry;
 		} catch (...) {
 			std::cerr << "Error parsing geofence file" << std::endl;
@@ -87,14 +93,15 @@ int UniflyNode::request_flight()
 	request["properties"]["lowerLimit"] = 0;
 	request["properties"]["upperLimit"] = 120;
 	request["properties"]["name"] = "TU Delft";
-	request["properties"]["crew"]["pilot"] = "e01c6f69-6107-456b-9031-6adc68afd24b";
-	request["properties"]["crew"]["user"] = "e01c6f69-6107-456b-9031-6adc68afd24b";
+	request["properties"]["crew"]["pilot"] = _user_uuid;
+	request["properties"]["crew"]["user"] = _user_uuid;
+	request["properties"]["uas"] = _uas_uuid;
 //	request["properties"]["takeOffPosition"] = nlohmann::json({});
 //	request["properties"]["landPosition"] = nlohmann::json({});
 
 
 
-	//std::cout << request.dump(4) << std::endl;
+	std::cout << request.dump(4) << std::endl;
 
 	_comm.clear_headers();
 	_comm.add_header("authorization", "Bearer " + _access_token);
@@ -109,7 +116,7 @@ int UniflyNode::request_flight()
 	_comm.post(url.c_str(), postfields.c_str(), res);
 
 	nlohmann::json result = nlohmann::json::parse(res);
-//	std::cout << result.dump(4) << std::endl;
+	std::cout << result.dump(4) << std::endl;
 
 	try {
 		_operation_unique_identifier = result["uniqueIdentifier"];
@@ -125,6 +132,41 @@ int UniflyNode::request_flight()
 		std::cerr << "No position data available" << std::endl;
 		return -1;
 	}
+}
+
+int UniflyNode::get_user_id()
+{
+	std::string url = "https://" UNIFLY_HOST "/api/operator/users/me";
+
+	std::string res;
+	_comm.get(url.c_str(), res);
+
+	try {
+		nlohmann::json result = nlohmann::json::parse(res);
+		std::cout << result.dump(4) << std::endl;
+
+	} catch (...) {
+		std::cout << "Unusable result: " << res << std::endl;
+	}
+
+
+}
+
+int UniflyNode::get_validation_results()
+{
+	if (_operation_unique_identifier == "") {
+		std::cerr << "Unique Identifier for operation not set" << std::endl;
+	}
+
+	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/validationresults";
+
+
+	std::string res;
+	_comm.get(url.c_str(), res);
+
+	nlohmann::json result = nlohmann::json::parse(res);
+
+	std::cout << result.dump(4) << std::endl;
 }
 
 int UniflyNode::get_action_items()
@@ -144,13 +186,83 @@ int UniflyNode::get_action_items()
 	std::cout << result.dump(4) << std::endl;
 }
 
+int UniflyNode::send_tracking_position()
+{
+
+	_comm.clear_headers();
+	_comm.add_header("authorization", "Bearer " + _access_token);
+	_comm.add_header("content-type", "application/json");
+
+	if (_operation_unique_identifier == "") {
+		std::cerr << "Unique Identifier for operation not set" << std::endl;
+		return -1;
+	}
+
+	if (!_has_position_data) {
+		std::cerr << "No position data available" << std::endl;
+		return -1;
+	}
+
+	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/uases/" + _uas_uuid + "/track";
+
+	nlohmann::json tracking;
+	// REQUIRED
+	tracking["location"]["latitude"] = _lat;
+	tracking["location"]["longitude"] = _lon;
+	tracking["pilotLocation"]["latitude"] = _pilot_lat;
+	tracking["pilotLocation"]["longitude"] = _pilot_lon;
+	tracking["timestamp"] = get_timestamp();
+	// OPTIONAL
+	tracking["altitudeAGL"] = _alt_agl;
+	tracking["altitudeMSL"] = _alt_msl;
+
+	std::string postfields = tracking.dump();
+
+	std::cout << "Tracking: " << tracking.dump(4) << std::endl;
+
+	std::string res;
+	_comm.post(url.c_str(), postfields.c_str(), res);
+
+	std::cout << res << std::endl;
+	try {
+		nlohmann::json result = nlohmann::json::parse(res);
+		std::cout << result.dump(4) << std::endl;
+	} catch (...) {
+		std::cout << "Could not parse response" << std::endl;
+	}
+
+
+
+}
+
 int UniflyNode::set_position(float latitude, float longitude, float alt_msl, float alt_agl)
 {
 	_lat = latitude;
 	_lon = longitude;
 	_alt_msl = alt_msl;
 	_alt_agl = alt_agl;
+	if (_has_position_data == false) {
+		_pilot_lat = _lat;
+		_pilot_lon = _lon;
+	}
 	_has_position_data = true;
+}
+
+int UniflyNode::periodic()
+{
+	// send position?
+	if (_operation_unique_identifier != "" && _has_position_data) {
+		send_tracking_position();
+	} else {
+		std::cout << "Not sending, no position?" << std::endl;
+	}
+}
+
+uint64_t UniflyNode::get_timestamp()
+{
+	struct timeval tp;
+	gettimeofday(&tp, NULL);
+	return static_cast<std::uint64_t>(tp.tv_sec) * 1000L + tp.tv_usec / 1000;
 }
 
 void UniflyNode::position_update_callback(EventSource *es)
