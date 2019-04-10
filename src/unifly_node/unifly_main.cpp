@@ -47,10 +47,11 @@ int main(int argc, char* argv[])
 	eventloop.add(uav_hb);
 
 	*/
-//	Timer periodic_timer(&node, 2000, handle_periodic_timer);
-//	eventloop.add(periodic_timer);
+	Timer periodic_timer(&node, 2000, handle_periodic_timer);
+	eventloop.add(periodic_timer);
 
 	eventloop.add(node.gps_position_sub);
+	eventloop.add(node.command_listener);
 
 	node.start();
 	eventloop.start();

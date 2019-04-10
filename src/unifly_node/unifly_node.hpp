@@ -6,6 +6,7 @@
 #include "vutura_common/helper.hpp"
 #include "vutura_common/communicator.hpp"
 #include <vutura_common/subscription.hpp>
+#include <vutura_common/listener_replier.hpp>
 
 class UniflyNode {
 public:
@@ -16,14 +17,18 @@ public:
 	int get_validation_results();
 	int get_action_items();
 	int send_tracking_position();
+	int send_takeoff();
+	int send_land();
 	int set_position(float latitude, float longitude, float alt_msl, float alt_agl);
 	int periodic();
 	uint64_t get_timestamp();
 
 
 	Subscription gps_position_sub;//(&node, SOCK_PUBSUB_GPS_POSITION, handle_position_update);
+	ListenerReplier command_listener;
 
 	static void position_update_callback(EventSource* es);
+	static void command_callback(EventSource* es);
 
 private:
 
@@ -36,6 +41,7 @@ private:
 	std::string _user_uuid;
 
 	bool _has_position_data;
+	bool _takeoff;
 	double _lat;
 	double _lon;
 	double _alt_msl;
