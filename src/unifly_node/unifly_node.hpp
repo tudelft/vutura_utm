@@ -11,6 +11,7 @@ public:
 	UniflyNode();
 	int start();
 	int request_flight();
+	int get_action_items();
 	int set_position(float latitude, float longitude, float alt_msl, float alt_agl);
 
 
@@ -24,6 +25,7 @@ private:
 
 	Communicator _comm;
 	std::string _access_token;
+	std::string _operation_unique_identifier;
 
 	bool _has_position_data;
 	double _lat;

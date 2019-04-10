@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
@@ -42,6 +43,8 @@ int UniflyNode::start()
 	}
 
 	request_flight();
+	get_action_items();
+
 	return 0;
 }
 
@@ -58,22 +61,40 @@ int UniflyNode::request_flight()
 
 
 	nlohmann::json request;
+
+	// parse geofence file
+	std::string geometry_file = "/home/bart/airmap/geo_hoi.json";
+	nlohmann::json geometry;
+	if (geometry_file != "") {
+		try {
+			nlohmann::json geometry;
+			std::ifstream i(geometry_file);
+			i >> geometry;
+			//std::cout << geometry.dump(4) << std::endl;
+			request["geometry"] = geometry;
+		} catch (...) {
+			std::cerr << "Error parsing geofence file" << std::endl;
+		}
+	}
+
+//	geometry["type"] = "Point";
+//	geometry["coordinates"] = {4.4177055, 52.1692467};
+	//request["geometry"] = geometry;
+
 	request["type"] = "Feature";
 	request["properties"]["startTime"] = now;
 	request["properties"]["endTime"] = end;
-	request["properties"]["geoZone"]["lowerLimit"] = 0;
-	request["properties"]["geoZone"]["upperLimit"] = 120;
-	request["properties"]["name"] = "Waar moet ik dit veld voor gebruiken??";
-
-	nlohmann::json geometry;
-	geometry["type"] = "Point";
-	geometry["coordinates"] = {4.4177055, 52.1692467};
-	request["geometry"] = geometry;
-
+	request["properties"]["lowerLimit"] = 0;
+	request["properties"]["upperLimit"] = 120;
+	request["properties"]["name"] = "TU Delft";
+	request["properties"]["crew"]["pilot"] = "e01c6f69-6107-456b-9031-6adc68afd24b";
+	request["properties"]["crew"]["user"] = "e01c6f69-6107-456b-9031-6adc68afd24b";
+//	request["properties"]["takeOffPosition"] = nlohmann::json({});
+//	request["properties"]["landPosition"] = nlohmann::json({});
 
 
 
-	std::cout << request.dump(4) << std::endl;
+	//std::cout << request.dump(4) << std::endl;
 
 	_comm.clear_headers();
 	_comm.add_header("authorization", "Bearer " + _access_token);
@@ -87,12 +108,40 @@ int UniflyNode::request_flight()
 	std::string res;
 	_comm.post(url.c_str(), postfields.c_str(), res);
 
-	std::cout << res << std::endl;
+	nlohmann::json result = nlohmann::json::parse(res);
+//	std::cout << result.dump(4) << std::endl;
+
+	try {
+		_operation_unique_identifier = result["uniqueIdentifier"];
+	} catch (...) {
+		std::cerr << "Failed to extract operation unique identifier" << std::endl;
+		return -1;
+	}
+
+	std::cout << "Operation UniqueIdentifier: " << _operation_unique_identifier << std::endl;
+
 
 	if(!has_position_data()) {
 		std::cerr << "No position data available" << std::endl;
 		return -1;
 	}
+}
+
+int UniflyNode::get_action_items()
+{
+	if (_operation_unique_identifier == "") {
+		std::cerr << "Unique Identifier for operation not set" << std::endl;
+	}
+
+	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/actionItems";
+
+
+	std::string res;
+	_comm.get(url.c_str(), res);
+
+	nlohmann::json result = nlohmann::json::parse(res);
+
+	std::cout << result.dump(4) << std::endl;
 }
 
 int UniflyNode::set_position(float latitude, float longitude, float alt_msl, float alt_agl)

@@ -12,6 +12,14 @@
 
 #include "unifly_node.hpp"
 
+
+namespace unifly {
+	std::string username;
+	std::string password;
+	std::string client_id;
+	std::string secret;
+} // namespace airmap
+
 void handle_periodic_timer(EventSource* es) {
 	UniflyNode *node = static_cast<UniflyNode*>(es->_target_object);
 	uint64_t num_timer_events;
