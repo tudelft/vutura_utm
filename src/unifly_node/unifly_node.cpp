@@ -55,6 +55,7 @@ int UniflyNode::start()
 //	sleep(2); // beun, validation
 	get_validation_results();
 	get_action_items();
+	get_permission(_permission_uuid);
 
 	return 0;
 }
@@ -221,15 +222,15 @@ int UniflyNode::get_action_items()
 	} catch (...) {
 	}
 
-	std::cout << result.dump(4) << std::endl;
+	//std::cout << result.dump(4) << std::endl;
 
 	// request permission for action items
 
 	for (nlohmann::json::iterator it = result.begin(); it != result.end(); ++it) {
 	  std::cout << *it << '\n';
-	  std::string permission_uuid = (*it)["uniqueIdentifier"].get<std::string>();
-	  std::cout << "DIT IS DE PERMISSION ID: " << permission_uuid << std::endl;
-	  get_permission(permission_uuid);
+	  _permission_uuid = (*it)["uniqueIdentifier"].get<std::string>();
+	  std::cout << "DIT IS DE PERMISSION ID: " << _permission_uuid << std::endl;
+	  std::cout << (*it).dump(4) << std::endl;
 	}
 
 }
@@ -414,6 +415,35 @@ int UniflyNode::send_land()
 
 }
 
+int UniflyNode::send_cancel_permission()
+{
+	_comm.clear_headers();
+	_comm.add_header("authorization", "Bearer " + _access_token);
+	_comm.add_header("content-type", "application/json");
+
+	if (_permission_uuid == "") {
+		std::cerr << "No permission to cancel" << std::endl;
+		return -1;
+	}
+	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/permissions/" + _permission_uuid + "/cancellation";
+
+	std::string postfields = "{}";
+
+	std::string res;
+	_comm.post(url.c_str(), postfields.c_str(), res);
+
+	try {
+		nlohmann::json result = nlohmann::json::parse(res);
+		std::cout << result.dump(4) << std::endl;
+	} catch (...) {
+		std::cout << "Could not parse response" << std::endl;
+	}
+
+
+	return 0;
+
+}
+
 int UniflyNode::set_position(float latitude, float longitude, float alt_msl, float alt_agl)
 {
 	_lat = latitude;
@@ -478,6 +508,14 @@ void UniflyNode::command_callback(EventSource *es)
 	} else if (command == "takeoff") {
 		reply = "taking off";
 		node->send_takeoff();
+
+	} else if (command == "action_items") {
+		reply = "getting action items";
+		node->get_action_items();
+
+	} else if (command == "cancel") {
+		reply = "cancelling";
+		node->send_cancel_permission();
 	}
 
 	rep->send_response(reply);

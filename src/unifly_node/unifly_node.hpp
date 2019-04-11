@@ -20,6 +20,7 @@ public:
 	int send_tracking_position();
 	int send_takeoff();
 	int send_land();
+	int send_cancel_permission();
 	int set_position(float latitude, float longitude, float alt_msl, float alt_agl);
 	int periodic();
 	uint64_t get_timestamp();
@@ -40,6 +41,7 @@ private:
 	std::string _operation_unique_identifier;
 	std::string _uas_uuid;
 	std::string _user_uuid;
+	std::string _permission_uuid;
 
 	bool _has_position_data;
 	bool _takeoff;
