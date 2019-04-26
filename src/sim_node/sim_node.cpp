@@ -24,11 +24,11 @@ int SimNode::handle_periodic_timer()
 	}
 
 
-//	float lat_0 = 52.17006269856014; // valkenburg
-//	float lon_0 = 4.4194865226745605;
+	float lat_0 = 52.17006269856014; // valkenburg
+	float lon_0 = 4.4194865226745605;
 
-	float lat_0 = 48.58605; // france (podium)
-	float lon_0 =   2.32681;
+//	float lat_0 = 48.58605; // france (podium)
+//	float lon_0 =   2.32681;
 
 	float lon = lon_0 + 0.003 * std::cos(_angle);
 	float lat = lat_0 + 0.002 * std::sin(_angle);

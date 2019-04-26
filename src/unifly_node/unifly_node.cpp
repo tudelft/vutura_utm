@@ -20,10 +20,10 @@ UniflyNode::UniflyNode(int instance) :
 	_takeoff(false)
 {
 	// hard-coded for now, can also be requested through the api
-//	_uas_uuid = "e6755d9f-1b83-4993-a121-aaeab695996a"; // vutura
-//	_user_uuid = "e01c6f69-6107-456b-9031-6adc68afd24b"; // vutura
-	_uas_uuid = "897f53b7-61f0-4bd8-b1c4-9bc9a98d64b4"; // parrot disco in podium
-	_user_uuid = "67f8413e-10a4-48bf-9948-c3d2d532cdee"; // podium
+	_uas_uuid = "e6755d9f-1b83-4993-a121-aaeab695996a"; // vutura
+	_user_uuid = "e01c6f69-6107-456b-9031-6adc68afd24b"; // vutura
+//	_uas_uuid = "897f53b7-61f0-4bd8-b1c4-9bc9a98d64b4"; // parrot disco in podium
+//	_user_uuid = "67f8413e-10a4-48bf-9948-c3d2d532cdee"; // podium
 }
 
 int UniflyNode::start()
@@ -42,12 +42,20 @@ int UniflyNode::start()
 	auto j = nlohmann::json::parse(res);
 	try {
 		_access_token = j["access_token"].get<std::string>();
-		std::cout << "Got access token:" << std::endl;
+		std::cout << "Got access token: ";
 		std::cout << _access_token << std::endl;
 	} catch (...) {
 		std::cerr << "Error getting access token" << std::endl;
 		return -1;
 	}
+
+	// save access token
+	std::string file = "/home/bart/unifly/token.txt";
+	std::ofstream os;
+	os.open(file, std::ios::trunc | std::ios::out);
+	os << _access_token;
+
+	os.close();
 
 //	get_user_id();
 //	return 0;
@@ -55,7 +63,7 @@ int UniflyNode::start()
 //	sleep(2); // beun, validation
 	get_validation_results();
 	get_action_items();
-	get_permission(_permission_uuid);
+	//get_permission(_permission_uuid);
 
 	return 0;
 }
@@ -75,7 +83,7 @@ int UniflyNode::request_flight()
 	nlohmann::json request;
 
 	// parse geofence file
-	std::string geometry_file = "/home/bart/unifly/geo_bressonvilliers.json";
+	std::string geometry_file = "/home/bart/unifly/geo_hoi.json";
 	nlohmann::json geometry;
 	if (geometry_file != "") {
 		try {
@@ -107,7 +115,7 @@ int UniflyNode::request_flight()
 
 
 
-	std::cout << request.dump(4) << std::endl;
+	//std::cout << request.dump(4) << std::endl;
 
 	_comm.clear_headers();
 	_comm.add_header("authorization", "Bearer " + _access_token);
@@ -154,7 +162,8 @@ int UniflyNode::get_user_id()
 
 	try {
 		nlohmann::json result = nlohmann::json::parse(res);
-		std::cout << result.dump(4) << std::endl;
+//		std::cout << result.dump(4) << std::endl;
+		std::cout << "User UUID: " << result["uniqueIdentifier"] << std::endl;
 
 	} catch (...) {
 		std::cout << "Unusable result: " << res << std::endl;
@@ -183,15 +192,16 @@ int UniflyNode::get_validation_results()
 		nlohmann::json result;
 		try {
 			result = nlohmann::json::parse(res);
-			std::cout << result.dump(4) << std::endl;
+//			std::cout << result.dump(4) << std::endl;
 
 		} catch (...) {
 		}
 
 		if (result.dump() != "[]") {
+			std::cout << "validation complete" << std::endl;
 			break;
 		} else {
-			std::cout << "pending..." << std::endl;
+			std::cout << "validation pending..." << std::endl;
 			sleep(1);
 		}
 	}
@@ -229,8 +239,8 @@ int UniflyNode::get_action_items()
 	for (nlohmann::json::iterator it = result.begin(); it != result.end(); ++it) {
 	  std::cout << *it << '\n';
 	  _permission_uuid = (*it)["uniqueIdentifier"].get<std::string>();
-	  std::cout << "DIT IS DE PERMISSION ID: " << _permission_uuid << std::endl;
-	  std::cout << (*it).dump(4) << std::endl;
+	  std::cout << "Action item permission UUID: " << _permission_uuid << std::endl;
+//	  std::cout << (*it).dump(4) << std::endl;
 	}
 
 }
@@ -256,7 +266,7 @@ int UniflyNode::get_permission(std::string uuid)
 
 	std::string postfields = permission.dump();
 
-	std::cout << "Permission Request: " << permission.dump(4) << std::endl;
+	//std::cout << "Permission Request: " << permission.dump(4) << std::endl;
 
 	std::string res;
 	_comm.multipart_post(url.c_str(), postfields.c_str(), res);
@@ -264,6 +274,44 @@ int UniflyNode::get_permission(std::string uuid)
 	try {
 		nlohmann::json result = nlohmann::json::parse(res);
 		std::cout << "Permission request result: " << std::endl;
+		std::cout << result.dump(4) << std::endl;
+	} catch (...) {
+		std::cout << "Could not parse response" << std::endl;
+	}
+}
+
+int UniflyNode::get_traffic_channels()
+{
+	_comm.clear_headers();
+	_comm.add_header("authorization", "Bearer " + _access_token);
+	_comm.add_header("content-type", "application/json");
+
+	if (!_has_position_data) {
+		std::cerr << "No position data available" << std::endl;
+		return -1;
+	}
+
+	std::string url = "https://" UNIFLY_HOST "/api/realtime/position";
+
+
+	nlohmann::json position;
+	position["latitude"] = _lat;
+	position["longitude"] = _lon;
+
+//	nlohmann::json request;
+//	request["bounds"]["location"] = position;
+//	request["bounds"]["width"] = 50000;
+//	request["bounds"]["height"] = 50000;
+
+	std::string postfields = position.dump();
+
+
+	std::string res;
+	_comm.post(url.c_str(), postfields.c_str(), res);
+
+	try {
+		nlohmann::json result = nlohmann::json::parse(res);
+		std::cout << "Traffic channels: " << std::endl;
 		std::cout << result.dump(4) << std::endl;
 	} catch (...) {
 		std::cout << "Could not parse response" << std::endl;
@@ -288,7 +336,7 @@ int UniflyNode::send_tracking_position()
 	}
 
 	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/uases/" + _uas_uuid + "/track";
-	std::cout << "URL: " << url << std::endl;
+	//std::cout << "URL: " << url << std::endl;
 
 	time_t current_time;
 	time(&current_time);
@@ -307,7 +355,8 @@ int UniflyNode::send_tracking_position()
 
 	std::string postfields = tracking.dump();
 
-	std::cout << "Tracking: " << tracking.dump(4) << std::endl;
+//	std::cout << "Tracking: " << tracking.dump(4) << std::endl;
+
 
 	std::string res;
 	_comm.post(url.c_str(), postfields.c_str(), res);
@@ -362,6 +411,7 @@ int UniflyNode::send_takeoff()
 		std::cout << result.dump(4) << std::endl;
 	} catch (...) {
 		std::cout << "Could not parse response" << std::endl;
+		std::cout << res << std::endl;
 	}
 
 	_takeoff = true;
@@ -434,7 +484,8 @@ int UniflyNode::send_cancel_permission()
 
 	try {
 		nlohmann::json result = nlohmann::json::parse(res);
-		std::cout << result.dump(4) << std::endl;
+//		std::cout << result.dump(4) << std::endl;
+		std::cout << "Cancell permission, new status: " << result["status"] << std::endl;
 	} catch (...) {
 		std::cout << "Could not parse response" << std::endl;
 	}
@@ -516,6 +567,10 @@ void UniflyNode::command_callback(EventSource *es)
 	} else if (command == "cancel") {
 		reply = "cancelling";
 		node->send_cancel_permission();
+
+	} else if (command == "get_traffic_channels") {
+		reply = "getting channels";
+		node->get_traffic_channels();
 	}
 
 	rep->send_response(reply);

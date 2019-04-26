@@ -17,6 +17,7 @@ public:
 	int get_validation_results();
 	int get_action_items();
 	int get_permission(std::string uuid);
+	int get_traffic_channels();
 	int send_tracking_position();
 	int send_takeoff();
 	int send_land();
