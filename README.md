@@ -43,6 +43,21 @@ cmake ..
 make
 ```
 
+## Build for RPi
+
+Use the compiler repository from `https://github.com/raspberrypi/tools`
+
+For cryptopp, use `https://github.com/bartslinger/cryptopp/tree/crosscompile_rpi`
+```
+git clone https://github.com/bartslinger/cryptopp
+cd cryptopp
+git checkout crosscompile_rpi
+export ARM_EMBEDDED_SYSROOT=<rpi/tools>/arm-bcm2708/arm-linux-gnueabihf/arm-linux-gnueabihf
+export ARM_EMBEDDED_TOOLCHAIN=<rpi/tools>/arm-bcm2708/arm-linux-gnueabihf/bin
+source ./setenv-rpi.sh
+make -f GNUmakefile-cross -j8
+```
+
 ## Run instructions
 
 Before running airmap_node, create a configuration file (for example airmap_config.json)
