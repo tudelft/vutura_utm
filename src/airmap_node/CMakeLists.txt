@@ -25,4 +25,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../../> # for vutura_common
 	)
 
-target_link_libraries(${PROJECT_NAME} vutura_common curl cryptopp nlohmann_json paho-mqttpp3)
+
+set(Curl_LIBRARIES ${CMAKE_INSTALL_PREFIX}/lib/libcurl.so)
+set(Cryptopp_LIBRARIES ${CMAKE_INSTALL_PREFIX}/lib/libcryptopp.a)
+
+target_link_libraries(${PROJECT_NAME} vutura_common ${Curl_LIBRARIES} ${Protobuf_LIBRARIES} ${Cryptopp_LIBRARIES} nlohmann_json ${PAHO_MQTT_C_LIBRARIES})

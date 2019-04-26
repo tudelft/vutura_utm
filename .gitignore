@@ -1,4 +1,5 @@
 build/*
+build-rpi/*
 
 # Generated files
 include/proto/*
