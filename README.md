@@ -5,17 +5,10 @@
 ### General dependencies
 ```
 sudo apt-get install nlohmann-json-dev
+sudo apt-get install protobuf-compiler
 ```
 
 Go to a directory where you want to clone the dependencies
-```
-git clone https://github.com/protobuf-c/protobuf-c.git
-git checkout v1.3.1
-cd protobuf-c/build-cmake
-cmake .
-make
-sudo make install
-```
 
 ```
 git clone https://github.com/weidai11/cryptopp.git
