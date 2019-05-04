@@ -6,9 +6,12 @@
 
 #include "vutura_common.pb.h"
 
+#include "avoidance_config.hpp"
+#include "avoidance_geometry.hpp"
+
 class AvoidanceNode {
 public:
-	AvoidanceNode(int instance);
+	AvoidanceNode(int instance, Avoidance_config& config, Avoidance_geometry& geometry);
 
 	int handle_periodic_timer();
 	int handle_traffic(const TrafficInfo& traffic);
@@ -22,6 +25,8 @@ public:
 
 private:
 	Requester _avoidance_req;
+	Avoidance_config& _avoidance_config;
+    Avoidance_geometry& _avoidance_geometry;
 
 	bool _gps_position_valid;
 	double _lat;

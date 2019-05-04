@@ -2,18 +2,74 @@
 #include "vutura_common/event_loop.hpp"
 #include "vutura_common/timer.hpp"
 #include "vutura_common/subscription.hpp"
+#include "vutura_common/cxxopts.hpp"
+#include "avoidance_config.hpp"
+#include "avoidance_geometry.hpp"
 
 #include "avoidance_node.hpp"
 
-int main(int argc, char **argv)
+int main(int argc, char* argv[])
 {
 	int instance = 0;
-	if (argc > 1) {
-		instance = atoi(argv[1]);
-	}
-	std::cout << "Instance " << std::to_string(instance) << std::endl;
+	std::string config_file = "";
+	std::string geometry_file = "";
 
-	AvoidanceNode node(instance);
+	Avoidance_config config;
+	Avoidance_geometry geometry;
+
+	try
+	{
+		cxxopts::Options options(argv[0], " - Airmap Avoidance node");
+		options
+				.positional_help("[optional args]")
+				.show_positional_help();
+
+		options
+				.add_options()
+				("i,instance", "Instance number, used for running multiple instances", cxxopts::value<int>(instance), "N")
+				("c,config", "Airmap configuration file", cxxopts::value<std::string>(config_file), "FILE")
+				("g,geometry", "GeoJSON Geometry file", cxxopts::value<std::string>(geometry_file), "FILE")
+				("help", "Print help")
+				;
+
+		auto result = options.parse(argc, argv);
+
+		if (result.count("help"))
+		{
+			std::cout << options.help() << std::endl;
+			exit(0);
+		}
+		
+		
+		if (result.count("c")) 
+		{
+			// parse config
+			std::cout << "Using config file: " << config_file << std::endl;
+			if (config.parse_config(config_file.c_str()) != 0) {
+				exit(EXIT_FAILURE);
+			}
+		} else {
+			std::cout << "No configuration file given, using standard configuration" << std::endl;
+		}
+
+		if (result.count("g"))
+		{
+			// parse geojson features
+			std::cout << "Using geometry file: " << geometry_file << std::endl;
+			if (geometry.parse_geometry(geometry_file.c_str()) != 0) {
+				exit(EXIT_FAILURE);
+			}
+		} else {
+			std::cout << "No geometry file selected, no flightplplan and geofence known to the avoidance computer" << std::endl;
+		}
+	} catch (const cxxopts::OptionException& e)
+	{
+		std::cout << "error parsing options: " << e.what() << std::endl;
+		exit(1);
+	}
+    std::cout << "Instance " << std::to_string(instance) << std::endl;
+
+	AvoidanceNode node(instance, config, geometry);
 	EventLoop event_loop;
 
 	Timer periodic_timer(&node, 200, node.periodic_timer_callback);

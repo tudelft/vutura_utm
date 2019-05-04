@@ -7,8 +7,10 @@
 
 #include "avoidance_node.hpp"
 
-AvoidanceNode::AvoidanceNode(int instance) :
+AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_geometry& geometry) :
 	_avoidance_req(this, socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance), avoidance_reply_callback),
+	_avoidance_config(config),
+	_avoidance_geometry(geometry),
 	_gps_position_valid(false),
 	_lat(0),
 	_lon(0),
