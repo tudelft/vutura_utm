@@ -5,7 +5,7 @@ build-rpi/*
 include/proto/*
 
 # QtCreator IDE
-CMakeLists.txt.user
+CMakeLists.txt.user*
 .CMakeLists.txt.swp
 
 # Python stuff
