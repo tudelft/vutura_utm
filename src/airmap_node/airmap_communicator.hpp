@@ -116,12 +116,15 @@ public:
 
 		try{
 			auto j = nlohmann::json::parse(res);
-			//std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
 			if (j["data"]["authorizations"].size() == 0) {
-				m_authorization_status = "not required";
+				std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
+				m_authorization_status = "authorizations size is zero";
 			} else {
 				//				std::cout << "Authorization request: " << j["data"]["authorizations"][0]["status"] << std::endl;
 				m_authorization_status = j["data"]["authorizations"][0]["status"];
+			}
+			if (flight_authorized()) {
+				std::cout << j.dump(4) << std::endl;
 			}
 			std::cout << "Authorization status: " << m_authorization_status << std::endl;
 		}
@@ -246,6 +249,10 @@ private:
 			curl_easy_setopt(curl, CURLOPT_POST, 1L);
 			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AirmapCommunicator::writeFunction);
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+//			curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
+
 
 			res = curl_easy_perform(curl);
 			if (res != CURLE_OK) {
@@ -268,6 +275,8 @@ private:
 			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AirmapCommunicator::writeFunction);
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
 
 			res = curl_easy_perform(curl);
 			if (res != CURLE_OK) {
