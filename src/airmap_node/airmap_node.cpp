@@ -225,6 +225,7 @@ int AirmapNode::end_flight() {
 	_flightID = "";
 	_flightplanID = "";
 	update_state(STATE_LOGGED_IN);
+	std::cout << "Flight ended" << std::endl;
 }
 
 int AirmapNode::set_position(float latitude, float longitude, float alt_msl, float alt_agl) {
