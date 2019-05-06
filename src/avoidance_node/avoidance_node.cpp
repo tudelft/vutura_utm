@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <cmath>
+#include "sys/time.h"
 
 #include "vutura_common/event_loop.hpp"
 #include "vutura_common/timer.hpp"
@@ -18,7 +19,8 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_avoid(false),
 	_vx_sp(0),
 	_vy_sp(0),
-	_vz_sp(0)
+    _vz_sp(0),
+    _intruders()
 {
 
 }
@@ -34,27 +36,52 @@ int AvoidanceNode::handle_periodic_timer()
 	std::string request = avoidance_velocity.SerializeAsString();
 	_avoidance_req.send_request(request);
 
+    // perform traffic housekeeping
+    traffic_housekeeping(_avoidance_config.getTPopTraffic());
+
 	return 0;
 }
 
 int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
 {
-	double lat_i = traffic.lat() * 1e-7;
-	double lon_i = traffic.lon() * 1e-7;
+    std::string aircraft_id_i = traffic.aircraft_id();
+    double latd_i = traffic.lat() * 1e-7;
+    double lond_i = traffic.lon() * 1e-7;
 	double alt_i = traffic.alt() * 1e-3;
+    double hdg_i = traffic.heading();
+    double gs_i = traffic.groundspeed() * 1e-3;
+    double recorded_time_i = traffic.recorded_time() * 1e-3;
 
-	if(alt_i > 120) {
-		return 0;
-	}
+//	if(alt_i > 120) {
+//		return 0;
+//	}
 
-	if (!_gps_position_valid) {
-		std::cerr << "Unknown position of self" << std::endl;
-		return -1;
-	}
+    // Check if traffic already exists in traffic vector
+    bool intruder_match = false;
+    for (Avoidance_intruder& intruder : _intruders)
+    {
+        if (intruder.getAircraftId() == aircraft_id_i)
+        {
+            intruder_match = true;
+            intruder.setData(latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i);
+            std::cout << "updating id: " << intruder.getAircraftId() << std::endl;
+            break;
+        }
+    }
+    if (!intruder_match)
+    {
+        _intruders.push_back(Avoidance_intruder(aircraft_id_i, latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i));
+        std::cout << "adding id: " << aircraft_id_i << std::endl;
+    }
+
+    if (!_gps_position_valid) {
+        std::cerr << "Unknown position of self" << std::endl;
+        return -1;
+    }
 
 	// check distance to self
 	double x,y,dist;
-	get_relative_coordinates(_lat, _lon, lat_i, lon_i, &x, &y);
+    get_relative_coordinates(_lat, _lon, latd_i, lond_i, &x, &y);
 	dist = sqrt(x * x + y * y);
 	std::cout << "Traffic: " << std::to_string(x) << ", " << std::to_string(y) << "\tdist: " << dist << "\talt: " << alt_i << std::endl;
 
@@ -76,6 +103,8 @@ int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
 	_lon = gps_info.lon() * 1e-7;
 	_alt = gps_info.alt_msl() * 1e-3;
 	_gps_position_valid = true;
+
+    update_position_params(_own_pos, _lat, _lon, _alt);
 	//std::cout << "Got GPS: " << std::to_string(gps_info.lat() * 1e-7) << ", " << std::to_string(gps_info.lon() * 1e-7) << std::endl;
 }
 
@@ -113,6 +142,13 @@ int AvoidanceNode::get_relative_coordinates(double lat_0, double lon_0, double l
 	*y = k * cos_lat_i * std::sin(lon_i_rad - lon_0_rad) * 6371000;
 
 	return 0;
+}
+
+double AvoidanceNode::getTimeStamp()
+{
+        struct timeval tp;
+        gettimeofday(&tp, NULL);
+    return tp.tv_sec + tp.tv_usec * 1e-6;
 }
 
 void AvoidanceNode::periodic_timer_callback(EventSource *es)
@@ -162,3 +198,38 @@ void AvoidanceNode::avoidance_reply_callback(EventSource *es)
 		std::cout << reply << std::endl;
 	}
 }
+
+void AvoidanceNode::traffic_housekeeping(double t_pop_traffic)
+{
+    // cleaning up the traffic array
+    double time = getTimeStamp();
+    unsigned i = 0;
+    bool looping = _intruders.size();
+
+    while (looping)
+    {
+        if ((time - _intruders.at(i).getReceivedTime()) > t_pop_traffic)
+        {
+            std::cout << "popping id: " << _intruders.at(i).getAircraftId() << std::endl;
+            _intruders.erase(_intruders.begin() + i);
+            if (i >= _intruders.size())
+            {
+                looping = false;
+            }
+        }
+        else {
+            {
+                if ((i + 1) < _intruders.size())
+                {
+                    i++;
+                }
+                else
+                {
+                    looping = false;
+                }
+            }
+        }
+    }
+}
+
+

@@ -5,7 +5,11 @@
 
 #include "avoidance_geometry.hpp"
 
-Avoidance_geometry::Avoidance_geometry()
+Avoidance_geometry::Avoidance_geometry() :
+    _geofence(),
+    _flightplan(),
+    _airspeed(0),
+    _altitude(0)
 {
 
 };

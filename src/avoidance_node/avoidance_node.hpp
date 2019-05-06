@@ -8,6 +8,8 @@
 
 #include "avoidance_config.hpp"
 #include "avoidance_geometry.hpp"
+#include "avoidance_geo_tools.h"
+#include "avoidance_intruder.hpp"
 
 class AvoidanceNode {
 public:
@@ -17,6 +19,7 @@ public:
 	int handle_traffic(const TrafficInfo& traffic);
 	int handle_gps_position(const GPSMessage& gps_info);
 	int get_relative_coordinates(double lat_0, double lon_0, double lat_i, double lon_i, double *x, double *y);
+    double getTimeStamp();
 
 	static void periodic_timer_callback(EventSource *es);
 	static void traffic_callback(EventSource *es);
@@ -24,6 +27,8 @@ public:
 	static void avoidance_reply_callback(EventSource *es);
 
 private:
+    void traffic_housekeeping(double t_pop_traffic);
+
 	Requester _avoidance_req;
 	Avoidance_config& _avoidance_config;
     Avoidance_geometry& _avoidance_geometry;
@@ -38,4 +43,7 @@ private:
 	double _vy_sp;
 	double _vz_sp;
 
+    position_params _own_pos;
+
+    std::vector<Avoidance_intruder> _intruders;
 };
