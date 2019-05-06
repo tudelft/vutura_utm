@@ -181,11 +181,21 @@ int main(int argc, char* argv[])
 	// parse geofence file
 	if (geometry_file != "") {
 		try {
-			nlohmann::json geometry;
+			nlohmann::json j;
 			std::ifstream i(geometry_file);
-			i >> geometry;
-			std::cout << geometry.dump(4) << std::endl;
-			node.set_geometry(geometry);
+			i >> j;
+
+			// find the geofence
+			for(auto it = j["features"].begin(); it != j["features"].end(); ++it) {
+//				std::cout << "Name: " << (*it)["properties"]["name"] << std::endl;
+				if ((*it)["properties"]["name"] == "geofence") {
+					node.set_geometry((*it)["geometry"]);
+				}
+			}
+
+//			std::cout << j.dump(4) << std::endl;
+
+//			node.set_geometry(j);
 		} catch (...) {
 			std::cerr << "Error parsing geofence file" << std::endl;
 		}

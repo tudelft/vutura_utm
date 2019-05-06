@@ -63,7 +63,7 @@ int AirmapTraffic::start(const std::string& flightID, const std::string& token)
 int AirmapTraffic::stop()
 {
 	std::cout << "Disconnecting MQTT" << std::endl;
-	_client.disconnect();
+	_client.disconnect(3000);
 
 	if (_cb != nullptr) {
 		delete _cb;
