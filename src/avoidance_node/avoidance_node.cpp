@@ -16,11 +16,14 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_lat(0),
 	_lon(0),
 	_alt(0),
+        _vn(0),
+        _ve(0),
+        _vd(0),
 	_avoid(false),
-	_vx_sp(0),
-	_vy_sp(0),
-    _vz_sp(0),
-    _intruders()
+        _vn_sp(0),
+        _ve_sp(0),
+        _vd_sp(0),
+        _intruders()
 {
 
 }
@@ -30,71 +33,76 @@ int AvoidanceNode::handle_periodic_timer()
 	// every 200ms send velocity vector
 	AvoidanceVelocity avoidance_velocity;
 	avoidance_velocity.set_avoid(_avoid);
-	avoidance_velocity.set_vx(_vx_sp * 1000);
-	avoidance_velocity.set_vy(_vy_sp * 1000);
-	avoidance_velocity.set_vz(_vz_sp * 1000);
+        avoidance_velocity.set_vn(_vn_sp * 1000);
+        avoidance_velocity.set_ve(_ve_sp * 1000);
+        avoidance_velocity.set_vd(_vd_sp * 1000);
 	std::string request = avoidance_velocity.SerializeAsString();
 	_avoidance_req.send_request(request);
 
-    // perform traffic housekeeping
-    traffic_housekeeping(_avoidance_config.getTPopTraffic());
+        // perform traffic housekeeping
+        traffic_housekeeping(_avoidance_config.getTPopTraffic());
 
 	return 0;
 }
 
 int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
 {
-    std::string aircraft_id_i = traffic.aircraft_id();
-    double latd_i = traffic.lat() * 1e-7;
-    double lond_i = traffic.lon() * 1e-7;
-	double alt_i = traffic.alt() * 1e-3;
-    double hdg_i = traffic.heading();
-    double gs_i = traffic.groundspeed() * 1e-3;
-    double recorded_time_i = traffic.recorded_time() * 1e-3;
+        std::string aircraft_id_i = traffic.aircraft_id();
+        double latd_i = traffic.lat() * 1e-7;
+        double lond_i = traffic.lon() * 1e-7;
+        double alt_i = traffic.alt() * 1e-3;
+        double hdg_i = traffic.heading();
+        double gs_i = traffic.groundspeed() * 1e-3;
+        double recorded_time_i = traffic.recorded_time() * 1e-3;
+
+        std::cout << "HDG: " << hdg_i << std::endl;
 
 //	if(alt_i > 120) {
 //		return 0;
 //	}
 
-    // Check if traffic already exists in traffic vector
-    bool intruder_match = false;
-    for (Avoidance_intruder& intruder : _intruders)
-    {
-        if (intruder.getAircraftId() == aircraft_id_i)
+        // Check if traffic already exists in traffic vector
+        bool intruder_match = false;
+        for (Avoidance_intruder& intruder : _intruders)
         {
-            intruder_match = true;
-            intruder.setData(latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i);
-            std::cout << "updating id: " << intruder.getAircraftId() << std::endl;
-            break;
+                if (intruder.getAircraftId() == aircraft_id_i)
+                {
+                        intruder_match = true;
+                        intruder.setData(latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i);
+                        intruder.updateRelPos(_own_pos.lat, _own_pos.lon, _own_pos.alt, _own_pos.r);
+                        std::cout << "updating id: " << intruder.getAircraftId() << std::endl;
+                        break;
+                }
         }
-    }
-    if (!intruder_match)
-    {
-        _intruders.push_back(Avoidance_intruder(aircraft_id_i, latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i));
-        std::cout << "adding id: " << aircraft_id_i << std::endl;
-    }
+        if (!intruder_match)
+        {
+                Avoidance_intruder intruder(aircraft_id_i, latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i);
+                intruder.updateRelPos(_own_pos.lat, _own_pos.lon, _own_pos.alt, _own_pos.r);
+                _intruders.push_back(intruder);
+                std::cout << "adding id: " << aircraft_id_i << std::endl;
+        }
 
-    if (!_gps_position_valid) {
-        std::cerr << "Unknown position of self" << std::endl;
-        return -1;
-    }
+        if (!_gps_position_valid) {
+                std::cerr << "Unknown position of self" << std::endl;
+                return -1;
+        }
 
 	// check distance to self
-	double x,y,dist;
-    get_relative_coordinates(_lat, _lon, latd_i, lond_i, &x, &y);
-	dist = sqrt(x * x + y * y);
-	std::cout << "Traffic: " << std::to_string(x) << ", " << std::to_string(y) << "\tdist: " << dist << "\talt: " << alt_i << std::endl;
+//	double x,y,dist;
+//      get_relative_coordinates(_lat, _lon, latd_i, lond_i, &x, &y);
+//	dist = sqrt(x * x + y * y);
+//	std::cout << "Traffic: " << std::to_string(x) << ", " << std::to_string(y) << "\tdist: " << dist << "\talt: " << alt_i << std::endl;
 
-	// Worst avoidance algorithm in the world:
-	if (alt_i < 120 && dist < 2000) {
-		_vx_sp = x/dist * 6;
-		_vy_sp = y/dist * 6;
-		_vz_sp = 0;
+        // Worst avoidance algorithm in the world:
+//	if (alt_i < 120 && dist < 2000) {
+//		_vx_sp = x/dist * 6;
+//		_vy_sp = y/dist * 6;
+//		_vz_sp = 0;
 
-		_avoid = true;
-	} else {
-		//_avoid = false;
-	}
+//		_avoid = true;
+//	} else {
+//		//_avoid = false;
+//	}
 }
 
 int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
@@ -102,9 +110,12 @@ int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
 	_lat = gps_info.lat() * 1e-7;
 	_lon = gps_info.lon() * 1e-7;
 	_alt = gps_info.alt_msl() * 1e-3;
+        _vn = gps_info.vn() * 1e-3;
+        _ve = gps_info.ve() * 1e-3;
+        _vd = gps_info.vd() * 1e-3;
 	_gps_position_valid = true;
 
-    update_position_params(_own_pos, _lat, _lon, _alt);
+        update_position_params(_own_pos, _lat, _lon, _alt);
 	//std::cout << "Got GPS: " << std::to_string(gps_info.lat() * 1e-7) << ", " << std::to_string(gps_info.lon() * 1e-7) << std::endl;
 }
 
@@ -148,7 +159,7 @@ double AvoidanceNode::getTimeStamp()
 {
         struct timeval tp;
         gettimeofday(&tp, NULL);
-    return tp.tv_sec + tp.tv_usec * 1e-6;
+        return tp.tv_sec + tp.tv_usec * 1e-6;
 }
 
 void AvoidanceNode::periodic_timer_callback(EventSource *es)
@@ -201,35 +212,40 @@ void AvoidanceNode::avoidance_reply_callback(EventSource *es)
 
 void AvoidanceNode::traffic_housekeeping(double t_pop_traffic)
 {
-    // cleaning up the traffic array
-    double time = getTimeStamp();
-    unsigned i = 0;
-    bool looping = _intruders.size();
+        // cleaning up the traffic array
+        double time = getTimeStamp();
+        unsigned i = 0;
+        bool looping = _intruders.size();
 
-    while (looping)
-    {
-        if ((time - _intruders.at(i).getReceivedTime()) > t_pop_traffic)
+        while (looping)
         {
-            std::cout << "popping id: " << _intruders.at(i).getAircraftId() << std::endl;
-            _intruders.erase(_intruders.begin() + i);
-            if (i >= _intruders.size())
-            {
-                looping = false;
-            }
-        }
-        else {
-            {
-                if ((i + 1) < _intruders.size())
+                if ((time - _intruders.at(i).getReceivedTime()) > t_pop_traffic)
                 {
-                    i++;
+                        std::cout << "popping id: " << _intruders.at(i).getAircraftId() << std::endl;
+                        _intruders.erase(_intruders.begin() + i);
+                        if (i >= _intruders.size())
+                        {
+                                looping = false;
+                        }
                 }
                 else
                 {
-                    looping = false;
+                        if ((i + 1) < _intruders.size())
+                        {
+                                i++;
+                        }
+                        else
+                        {
+                                looping = false;
+                        }
                 }
-            }
         }
-    }
+}
+
+void AvoidanceNode::statebased_CD()
+{
+        const double rpz = _avoidance_config.getRPZ();
+        const double t_lookahead = _avoidance_config.getTLookahead();
 }
 
 

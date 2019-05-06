@@ -14,20 +14,20 @@ message GPSMessage {
 message TrafficInfo {
   required string unique_id = 1;
   required string aircraft_id = 2;
-  required uint64 timestamp = 3;
-  required uint64 recorded_time = 4;
-  required sint32 lat = 5;
-  required sint32 lon = 6;
-  required sint32 alt = 7;
-  required uint32 groundspeed = 8;
-  required uint32 heading = 9;
+  required uint64 timestamp = 3; // [ms]
+  required uint64 recorded_time = 4; // [ms]
+  required sint32 lat = 5; // [degE7]
+  required sint32 lon = 6; // [degE7]
+  required sint32 alt = 7; // [ftE3]
+  required uint32 groundspeed = 8; // [m/sE3]
+  required uint32 heading = 9; // [deg]
 }
 
 message AvoidanceVelocity {
   required bool avoid = 1;
-  required sint32 vx = 2;
-  required sint32 vy = 3;
-  required sint32 vz = 4;
+  required sint32 vn = 2; // [m/sE3]
+  required sint32 ve = 3; // [m/sE3]
+  required sint32 vd = 4; // [m/sE3]
 }
 
 message UavHeartbeat {

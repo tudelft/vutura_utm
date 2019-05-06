@@ -19,7 +19,7 @@ public:
 
 	void uav_command(std::string command);
 	void emit_heartbeat();
-	void avoidance_velocity_vector(bool avoid, float vx, float vy, float vz);
+        void avoidance_velocity_vector(bool avoid, float vn, float ve, float vd);
 	void set_armed_state(bool armed);
 	void set_guided_state(bool guided_mode_enabled);
 	void enable_offboard(bool offboard);

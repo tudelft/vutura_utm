@@ -6,11 +6,12 @@
 #include "avoidance_config.hpp"
 
 Avoidance_config::Avoidance_config() :
-    _t_lookahead(AVOIDANCE_T_LOOKAHEAD),
-    _t_pop_traffic(AVOIDANCE_T_POP_TRAFFIC)
-    {
+            _t_lookahead(AVOIDANCE_T_LOOKAHEAD),
+            _t_pop_traffic(AVOIDANCE_T_POP_TRAFFIC),
+            _r_pz(AVOIDANCE_RPZ)
+            {
 
-    }
+            }
 
 int Avoidance_config::parse_config(std::string config_file)
 {
@@ -19,7 +20,8 @@ int Avoidance_config::parse_config(std::string config_file)
 		std::ifstream i(config_file);
 		i >> config;
 		_t_lookahead = config["t_lookahead"];
-        _t_pop_traffic = config["t_pop_traffic"];
+                _t_pop_traffic = config["t_pop_traffic"];
+                _r_pz = config["r_pz"];
 	} catch (...) {
 		std::cerr << "Failed to parse config file " << config_file << std::endl;
 		return -1;
@@ -28,7 +30,17 @@ int Avoidance_config::parse_config(std::string config_file)
 	return 0;
 }
 
+double Avoidance_config::getTLookahead()
+{
+        return _t_lookahead;
+}
+
 double Avoidance_config::getTPopTraffic()
 {
-    return _t_pop_traffic;
+        return _t_pop_traffic;
+}
+
+double Avoidance_config::getRPZ()
+{
+        return _r_pz;
 }

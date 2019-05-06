@@ -84,7 +84,7 @@ void MavlinkNode::emit_heartbeat()
 	//printf("[%s] sent heartbeat %d bytes\n", node->name, bytes_sent);
 }
 
-void MavlinkNode::avoidance_velocity_vector(bool avoid, float vx, float vy, float vz)
+void MavlinkNode::avoidance_velocity_vector(bool avoid, float vn, float ve, float vd)
 {
 	// Disable avoidance mode
 	if (_avoiding != avoid && !avoid) {
@@ -107,9 +107,9 @@ void MavlinkNode::avoidance_velocity_vector(bool avoid, float vx, float vy, floa
 			POSITION_TARGET_TYPEMASK_AY_IGNORE |
 			POSITION_TARGET_TYPEMASK_AZ_IGNORE |
 			POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE;
-	offboard_target.vx = vx;
-	offboard_target.vy = vy;
-	offboard_target.vz = vz;
+        offboard_target.vx = vn;
+        offboard_target.vy = ve;
+        offboard_target.vz = vd;
 	offboard_target.yaw = std::atan2(offboard_target.vy, offboard_target.vx);
 
 	mavlink_message_t msg;
@@ -235,7 +235,7 @@ void MavlinkNode::avoidance_command_callback(EventSource *es)
 	rep->send_response(response);
 
 	// do something with it
-	node->avoidance_velocity_vector(avoidance_msg.avoid(), 0.001 * avoidance_msg.vx(), 0.001 * avoidance_msg.vy(), 0.001 * avoidance_msg.vz());
+        node->avoidance_velocity_vector(avoidance_msg.avoid(), 0.001 * avoidance_msg.vn(), 0.001 * avoidance_msg.ve(), 0.001 * avoidance_msg.vd());
 
 }
 
