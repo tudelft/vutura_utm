@@ -1,4 +1,5 @@
 #include <fstream>
+#include <iostream>
 
 // json -- https://github.com/nlohmann/json
 #include <nlohmann/json.hpp>
@@ -12,7 +13,7 @@ Avoidance_geometry::Avoidance_geometry() :
     _altitude(0)
 {
 
-};
+}
 
 int Avoidance_geometry::parse_geometry(std::string geometry_file)
 {

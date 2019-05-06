@@ -41,6 +41,7 @@ int AvoidanceNode::handle_periodic_timer()
 
         // perform traffic housekeeping
         traffic_housekeeping(_avoidance_config.getTPopTraffic());
+        statebased_CD();
 
 	return 0;
 }
@@ -69,7 +70,7 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
                 {
                         intruder_match = true;
                         intruder.setData(latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i);
-                        intruder.updateRelPos(_own_pos.lat, _own_pos.lon, _own_pos.alt, _own_pos.r);
+                        intruder.updateRelVar(_own_pos.lat, _own_pos.lon, _own_pos.alt, _vn, _ve, _own_pos.r);
                         std::cout << "updating id: " << intruder.getAircraftId() << std::endl;
                         break;
                 }
@@ -77,7 +78,7 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
         if (!intruder_match)
         {
                 Avoidance_intruder intruder(aircraft_id_i, latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i);
-                intruder.updateRelPos(_own_pos.lat, _own_pos.lon, _own_pos.alt, _own_pos.r);
+                intruder.updateRelVar(_own_pos.lat, _own_pos.lon, _own_pos.alt, _vn, _ve, _own_pos.r);
                 _intruders.push_back(intruder);
                 std::cout << "adding id: " << aircraft_id_i << std::endl;
         }
@@ -245,7 +246,42 @@ void AvoidanceNode::traffic_housekeeping(double t_pop_traffic)
 void AvoidanceNode::statebased_CD()
 {
         const double rpz = _avoidance_config.getRPZ();
+        const double rpz2 = pow(rpz, 2);
         const double t_lookahead = _avoidance_config.getTLookahead();
+
+        for (Avoidance_intruder intruder : _intruders)
+        {
+                // Relative variables
+                double pn_rel = intruder.getPnRel();
+                double pe_rel = intruder.getPeRel();
+                double vn_rel = intruder.getVnRel();
+                double ve_rel = intruder.getVeRel();
+                double v2_rel = intruder.getV2Rel();
+                double v_rel = intruder.getVRel();
+                double d2_rel = intruder.getD2Rel();
+
+                // calculation of conflict variables
+                double t_cpa = - (pn_rel * vn_rel + pe_rel * ve_rel) / (v2_rel);
+                double d_cpa = sqrt(d2_rel - pow(t_cpa, 2) * v2_rel);
+                double d2_cpa = pow(d_cpa, 2);
+
+                double d_in = 0;
+                double d_los = 1e6;
+                double t_los = 1e6;
+                if (d_cpa < rpz)
+                {
+                        d_in = sqrt(rpz2 - d2_cpa);
+                        d_los = v_rel * t_cpa - d_in;
+                        t_los = t_cpa - d_in / v_rel;
+                }
+
+                bool inconf = (d_cpa < rpz) && (t_los < t_lookahead);
+                intruder.setConflictPar(inconf, t_cpa, d_cpa, d_in, d_los, t_los);
+                if (inconf)
+                {
+                        std::cout << "In Conflict with: " << intruder.getAircraftId() << " in " << t_los << " seconds" << std::endl;
+                }
+        }
 }
 
 
