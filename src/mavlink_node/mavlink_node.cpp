@@ -33,7 +33,15 @@ void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg)
 	if (msg->msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
 		mavlink_global_position_int_t global_pos;
 		mavlink_msg_global_position_int_decode(msg, &global_pos);
-//		printf("[mavlink_node] got global position lat: %f lon: %f alt_msl: %f alt_agl: %f\n", global_pos.lat * 1e-7, global_pos.lon * 1e-7, global_pos.alt * 1e-3, global_pos.relative_alt * 1e-3);
+
+		static unsigned int skip_counter = 0;
+		if (skip_counter <= 20) {
+			skip_counter++;
+			return;
+		}
+		skip_counter = 0;
+
+		printf("[mavlink_node] got global position lat: %f lon: %f alt_msl: %f alt_agl: %f\n", global_pos.lat * 1e-7, global_pos.lon * 1e-7, global_pos.alt * 1e-3, global_pos.relative_alt * 1e-3);
 		GPSMessage gps_message;
 		uint16_t len;
 		gps_message.set_timestamp(0);
@@ -68,6 +76,9 @@ void MavlinkNode::uav_command(std::string command)
 		mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_MISSION_START, 0, 0, 0, 0, 0, 0, 0, 0);
 		uint16_t len = mavlink_msg_to_send_buffer(mavlink_comm.buf, &msg);
 		mavlink_comm.send_buffer(len);
+
+	} else if (command == "HB") {
+		// do nothing
 
 	} else {
 		std::cout << "Received: " << command << std::endl;

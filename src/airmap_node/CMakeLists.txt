@@ -4,6 +4,9 @@ project (airmap_node CXX)
 find_package(Protobuf REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(PahoMqttCpp REQUIRED)
+find_library(Curl_LIBRARIES curl)
+find_library(Cryptopp_LIBRARIES cryptopp)
+
 
 file(GLOB SRCS
 	"*.cpp"
@@ -24,9 +27,5 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../../> # for vutura_common
 	)
-
-
-set(Curl_LIBRARIES ${CMAKE_INSTALL_PREFIX}/lib/libcurl.so)
-set(Cryptopp_LIBRARIES ${CMAKE_INSTALL_PREFIX}/lib/libcryptopp.a)
 
 target_link_libraries(${PROJECT_NAME} vutura_common ${Curl_LIBRARIES} ${Protobuf_LIBRARIES} ${Cryptopp_LIBRARIES} nlohmann_json ${CMAKE_INSTALL_PREFIX}/lib/libpaho-mqttpp3.so)

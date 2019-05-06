@@ -156,12 +156,13 @@ uint64_t AirmapNode::getTimeStamp() {
 
 int AirmapNode::set_armed(bool armed)
 {
+	_pub_uav_command.publish("HB");
 	if (!armed) {
 		// disarm event
 		std::cout << "Disarm event" << std::endl;
 		if (_state == STATE_FLIGHT_STARTED) {
 			std::cout << "Automatically ending flight" << std::endl;
-			end_flight();
+			//end_flight();
 		}
 	}
 }

@@ -116,6 +116,7 @@ public:
 
 		try{
 			auto j = nlohmann::json::parse(res);
+			//std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
 			if (j["data"]["authorizations"].size() == 0) {
 				std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
 				if (j["status"] == "error") {

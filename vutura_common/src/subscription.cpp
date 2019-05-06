@@ -5,6 +5,7 @@ Subscription::Subscription(void *node, std::string url, void(*cb)(EventSource *)
 	EventSource(node, -1, cb),
 	_url(url)
 {
+	std::cout << "Subscribe: " << url << std::endl;
 	int rv;
 
 	if ((rv = nng_sub0_open(&_socket)) != 0) {
