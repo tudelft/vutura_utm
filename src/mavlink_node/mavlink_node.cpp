@@ -7,6 +7,7 @@
 #include <string.h>
 #include <poll.h>
 #include <sys/timerfd.h>
+#include <math.h>
 #include <string>
 #include <iostream>
 
@@ -121,7 +122,7 @@ void MavlinkNode::avoidance_velocity_vector(bool avoid, float vn, float ve, floa
         offboard_target.vx = vn;
         offboard_target.vy = ve;
         offboard_target.vz = vd;
-	offboard_target.yaw = std::atan2(offboard_target.vy, offboard_target.vx);
+	offboard_target.yaw = atan2(offboard_target.vy, offboard_target.vx);
 
 	mavlink_message_t msg;
 	mavlink_msg_set_position_target_local_ned_encode(255, 200, &msg, &offboard_target);
