@@ -118,7 +118,12 @@ public:
 			auto j = nlohmann::json::parse(res);
 			if (j["data"]["authorizations"].size() == 0) {
 				std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
-				m_authorization_status = "authorizations size is zero";
+				if (j["data"]["status"] == "error") {
+					m_authorization_status = "error with authorizations size zero";
+				} else {
+					std::cout << "No authorization required, status is: " << j["data"]["status"] << std::endl;
+					m_authorization_status = "not required";
+				}
 			} else {
 				//				std::cout << "Authorization request: " << j["data"]["authorizations"][0]["status"] << std::endl;
 				m_authorization_status = j["data"]["authorizations"][0]["status"];

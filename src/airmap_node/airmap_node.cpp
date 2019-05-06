@@ -218,7 +218,7 @@ int AirmapNode::end_flight() {
 	}
 	// end communication and flight
 	_traffic.stop();
-	_communicator.query_telemetry(_flightID);
+//	_communicator.query_telemetry(_flightID);
 	_communicator.end(_flightID);
 	_communicator.end_flight(_flightID);
 	_commsKey = "";
