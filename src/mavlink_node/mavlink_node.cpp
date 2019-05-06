@@ -42,6 +42,10 @@ void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg)
 		gps_message.set_alt_msl(global_pos.alt);
 		gps_message.set_alt_agl(global_pos.relative_alt);
 
+		gps_message.set_vn(global_pos.vx * 10);
+		gps_message.set_ve(global_pos.vy * 10);
+		gps_message.set_vd(global_pos.vz * 10);
+
 		node->gps_pub.publish(gps_message.SerializeAsString());
 
 		//printf("Writing %d serialized bytes\n", len);

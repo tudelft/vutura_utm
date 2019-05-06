@@ -2,10 +2,13 @@ syntax = "proto2";
 
 message GPSMessage {
   required uint64 timestamp = 1;
-  required sint32 lat = 2;
-  required sint32 lon = 3;
-  required sint32 alt_msl = 4;
-  required sint32 alt_agl = 5;
+  required sint32 lat = 2; // [degE7]
+  required sint32 lon = 3; // [degE7]
+  required sint32 alt_msl = 4; // [mm]
+  required sint32 alt_agl = 5; // [mm]
+  optional sint32 vn = 6; // [mm/s]
+  optional sint32 ve = 7; // [mm/s]
+  optional sint32 vd = 8; // [mm/s]
 }
 
 message TrafficInfo {
