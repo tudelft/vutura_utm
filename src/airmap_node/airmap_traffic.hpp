@@ -126,9 +126,13 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 			return;
 		}
 
-		try {
-			for (nlohmann::json::iterator it = traffic.begin(); it != traffic.end(); ++it) {
-//				std::cout << (*it).dump(4) << '\n';
+		for (nlohmann::json::iterator it = traffic.begin(); it != traffic.end(); ++it) {
+			try {
+				if ((*it)["altitude"].get<std::string>() == "") {
+					// invalid
+					std::cout << "Invalid altitude" << std::endl;
+					//continue;
+				}
 				TrafficInfo tinfo;
 				tinfo.set_unique_id((*it)["id"].get<std::string>());
 				tinfo.set_aircraft_id((*it)["properties"]["aircraft_id"].get<std::string>());
@@ -137,11 +141,20 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 				tinfo.set_lat(static_cast<int32_t>(std::stod( (*it)["latitude"].get<std::string>() ) * 1e7 ));
 				tinfo.set_lon(static_cast<int32_t>(std::stod( (*it)["longitude"].get<std::string>() ) * 1e7 ));
 				tinfo.set_alt(static_cast<int32_t>(std::stod( (*it)["altitude"].get<std::string>() ) * 1e3 ));
-				tinfo.set_groundspeed(static_cast<uint32_t>(std::stod( (*it)["groundspeed"].get<std::string>() ) * 1e3));
-				tinfo.set_heading(std::stoul( (*it)["true_heading"].get<std::string>() ));
 
-				if (tinfo.alt() < 80*1000) {
-					std::cout << (*it).dump(4) << std::endl;
+				// groundspeed and heading can be empty
+				std::string groundspeed = (*it)["groundspeed"].get<std::string>();
+				if (groundspeed != "") {
+					tinfo.set_groundspeed(static_cast<uint32_t>(std::stod( groundspeed ) * 1e3));
+				} else {
+					tinfo.set_groundspeed(0);
+				}
+
+				std::string heading = (*it)["true_heading"].get<std::string>();
+				if (heading != "") {
+					tinfo.set_heading(std::stoul( heading ));
+				} else {
+					tinfo.set_heading(0);
 				}
 
 				std::string tinfo_data = tinfo.SerializeAsString();
@@ -151,13 +164,13 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 				memcpy((char*)nng_msg_body(nngmsg), tinfo_data.c_str(), tinfo_data.length());
 				nng_sendmsg(*pub_traffic_, nngmsg, 0);
 				//std::cout << "Published traffic: " << tinfo.unique_id() << std::endl;
-			}
-			//std::cout << j["traffic"].dump(4) << std::endl;
 
-		} catch (...) {
-			std::cerr << "json parse fail: " << msg->to_string() << std::endl;
-			return;
+			} catch (...) {
+				std::cerr << "json parse fail: " << (*it).dump(4) << std::endl;
+				return;
+			}
 		}
+		//std::cout << j["traffic"].dump(4) << std::endl;
 	}
 
 	void delivery_complete(mqtt::delivery_token_ptr token) override {}
