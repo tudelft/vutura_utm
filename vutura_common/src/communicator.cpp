@@ -1,4 +1,5 @@
 #include "communicator.hpp"
+#include <iostream>
 
 Communicator::Communicator() {
 	_headers = NULL;
@@ -49,6 +50,9 @@ unsigned int Communicator::curl_post(const char *url, const curl_slist *headers,
 		if (res != CURLE_OK) {
 			fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
 		}
+		long response_code;
+		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+		std::cout << "Response: " << std::to_string(response_code) << std::endl;
 
 		curl_easy_cleanup(curl);
 	}

@@ -41,7 +41,7 @@ def onSubAck(channel, error, object):
     
     
 if __name__ == "__main__":
-    socket = Socketcluster.socket("wss://podium.unifly.aero/socketcluster/")
+    socket = Socketcluster.socket("wss://vutura.unifly.tech/socketcluster/")
     socket.setBasicListener(onconnect, ondisconnect, onConnectError)
     socket.setAuthenticationListener(onSetAuthentication, onAuthentication)
 

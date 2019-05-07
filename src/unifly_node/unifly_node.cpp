@@ -355,7 +355,7 @@ int UniflyNode::send_tracking_position()
 
 	std::string postfields = tracking.dump();
 
-//	std::cout << "Tracking: " << tracking.dump(4) << std::endl;
+	std::cout << "Tracking: " << tracking.dump(4) << std::endl;
 
 
 	std::string res;
@@ -424,6 +424,8 @@ int UniflyNode::send_land()
 	_comm.add_header("authorization", "Bearer " + _access_token);
 	_comm.add_header("content-type", "application/json");
 
+//	_operation_unique_identifier = "";
+//	_takeoff = true;
 	if (_operation_unique_identifier == "") {
 		std::cerr << "Unique Identifier for operation not set" << std::endl;
 		return -1;
