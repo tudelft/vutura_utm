@@ -28,7 +28,7 @@ public:
 
 private:
         void traffic_housekeeping(double t_pop_traffic);
-        void statebased_CD();
+        void statebased_CD(Avoidance_intruder& inntruder);
 
 	Requester _avoidance_req;
 	Avoidance_config& _avoidance_config;

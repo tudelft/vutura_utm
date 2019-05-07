@@ -2,6 +2,8 @@
 #include <cmath>
 #include "sys/time.h"
 
+#include "clipper/clipper.hpp"
+
 #include "vutura_common/event_loop.hpp"
 #include "vutura_common/timer.hpp"
 #include "vutura_common/subscription.hpp"
@@ -41,22 +43,25 @@ int AvoidanceNode::handle_periodic_timer()
 
         // perform traffic housekeeping
         traffic_housekeeping(_avoidance_config.getTPopTraffic());
-        statebased_CD();
 
 	return 0;
 }
 
 int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
-{
+{       
         std::string aircraft_id_i = traffic.aircraft_id();
+//        if (aircraft_id_i.find("flight|"))
+//        {
+//                return 0;
+//        }
         double latd_i = traffic.lat() * 1e-7;
         double lond_i = traffic.lon() * 1e-7;
         double alt_i = traffic.alt() * 1e-3;
         double hdg_i = traffic.heading();
         double gs_i = traffic.groundspeed() * 1e-3;
-        double recorded_time_i = traffic.recorded_time() * 1e-3;
-
-        std::cout << "HDG: " << hdg_i << std::endl;
+        double recorded_time_i = traffic.recorded_time();// * 1e-3;
+        double delay = getTimeStamp() - recorded_time_i;
+        std::cout << "Delay: " << delay << std::endl;
 
 //	if(alt_i > 120) {
 //		return 0;
@@ -72,6 +77,7 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
                         intruder.setData(latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i);
                         intruder.updateRelVar(_own_pos.lat, _own_pos.lon, _own_pos.alt, _vn, _ve, _own_pos.r);
                         std::cout << "updating id: " << intruder.getAircraftId() << std::endl;
+                        statebased_CD(intruder);
                         break;
                 }
         }
@@ -81,6 +87,7 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
                 intruder.updateRelVar(_own_pos.lat, _own_pos.lon, _own_pos.alt, _vn, _ve, _own_pos.r);
                 _intruders.push_back(intruder);
                 std::cout << "adding id: " << aircraft_id_i << std::endl;
+                statebased_CD(intruder);
         }
 
         if (!_gps_position_valid) {
@@ -243,44 +250,43 @@ void AvoidanceNode::traffic_housekeeping(double t_pop_traffic)
         }
 }
 
-void AvoidanceNode::statebased_CD()
+void AvoidanceNode::statebased_CD(Avoidance_intruder& intruder)
 {
         const double rpz = _avoidance_config.getRPZ();
         const double rpz2 = pow(rpz, 2);
         const double t_lookahead = _avoidance_config.getTLookahead();
 
-        for (Avoidance_intruder intruder : _intruders)
+        // Relative variables
+        double pn_rel = intruder.getPnRel();
+        double pe_rel = intruder.getPeRel();
+        double vn_rel = intruder.getVnRel();
+        double ve_rel = intruder.getVeRel();
+        double v2_rel = intruder.getV2Rel();
+        double v_rel = intruder.getVRel();
+        double d2_rel = intruder.getD2Rel();
+
+        // calculation of horizontal conflict variables
+        double t_cpa = - (pn_rel * vn_rel + pe_rel * ve_rel) / (v2_rel);
+        double d_cpa = sqrt(d2_rel - pow(t_cpa, 2) * v2_rel);
+        double d2_cpa = pow(d_cpa, 2);
+
+        double d_in = 0;
+        double d_los = 1e6;
+        double t_los = 1e6;
+        double t_out = 1e6;
+        if ((d_cpa < rpz) && (t_cpa > 0))
         {
-                // Relative variables
-                double pn_rel = intruder.getPnRel();
-                double pe_rel = intruder.getPeRel();
-                double vn_rel = intruder.getVnRel();
-                double ve_rel = intruder.getVeRel();
-                double v2_rel = intruder.getV2Rel();
-                double v_rel = intruder.getVRel();
-                double d2_rel = intruder.getD2Rel();
-
-                // calculation of conflict variables
-                double t_cpa = - (pn_rel * vn_rel + pe_rel * ve_rel) / (v2_rel);
-                double d_cpa = sqrt(d2_rel - pow(t_cpa, 2) * v2_rel);
-                double d2_cpa = pow(d_cpa, 2);
-
-                double d_in = 0;
-                double d_los = 1e6;
-                double t_los = 1e6;
-                if (d_cpa < rpz)
-                {
-                        d_in = sqrt(rpz2 - d2_cpa);
-                        d_los = v_rel * t_cpa - d_in;
-                        t_los = t_cpa - d_in / v_rel;
-                }
-
-                bool inconf = (d_cpa < rpz) && (t_los < t_lookahead);
-                intruder.setConflictPar(inconf, t_cpa, d_cpa, d_in, d_los, t_los);
-                if (inconf)
-                {
-                        std::cout << "In Conflict with: " << intruder.getAircraftId() << " in " << t_los << " seconds" << std::endl;
-                }
+                d_in = sqrt(rpz2 - d2_cpa);
+                d_los = v_rel * t_cpa - d_in;
+                double dt_in = d_in / v_rel;
+                t_los = t_cpa - dt_in;
+                t_out = t_cpa + dt_in;
+        }
+        bool inconf = (d_cpa < rpz) && (t_los < t_lookahead) && (t_out > 0);
+        intruder.setConflictPar(inconf, t_cpa, d_cpa, d_in, d_los, t_los);
+        if (inconf)
+        {
+                std::cout << "In Conflict with: " << intruder.getAircraftId() << " in " << t_los << " seconds" << " \t d_cpa: " << d_cpa << std::endl;
         }
 }
 

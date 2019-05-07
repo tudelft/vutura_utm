@@ -53,7 +53,7 @@ void Avoidance_intruder::updateRelVar(double lat_own, double lon_own, double alt
         _rel_var.dist = sqrt(_rel_var.dist2);
         _rel_var.bearing = atan2(_rel_var.pe, _rel_var.pn);
 
-        std::cout << "Traffic \t ID: " << _aircaft_id << " \t (n, e): (" << _rel_var.pn << ", " << _rel_var.pe << ") \t dist: " << _rel_var.dist << " \t bearing: " << _rel_var.bearing << std::endl;
+//        std::cout << "Traffic \t ID: " << _aircaft_id << " \t (n, e): (" << _rel_var.pn << ", " << _rel_var.pe << ") \t dist: " << _rel_var.dist << " \t bearing: " << _rel_var.bearing << std::endl;
 }
 
 void Avoidance_intruder::setConflictPar(bool inconf, double t_cpa, double d_cpa, double d_in, double d_los, double t_los)
@@ -66,9 +66,24 @@ void Avoidance_intruder::setConflictPar(bool inconf, double t_cpa, double d_cpa,
         _conflict.t_los = t_los;
 }
 
+double Avoidance_intruder::getVn()
+{
+        return _vn;
+}
+
+double Avoidance_intruder::getVe()
+{
+        return _ve;
+}
+
 double Avoidance_intruder::getReceivedTime()
 {
         return _received_time;
+}
+
+double Avoidance_intruder::getRecordedTime()
+{
+        return _recorded_time;
 }
 
 double Avoidance_intruder::getPnRel()

@@ -11,6 +11,9 @@ public:
                                 double gs, double recorded_time);
 
         std::string getAircraftId();
+        double getVn();
+        double getVe();
+        double getRecordedTime();
         double getReceivedTime();
         double getPnRel();
         double getPeRel();
