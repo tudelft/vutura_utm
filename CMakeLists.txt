@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.1)
 project (vutura_utm CXX)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 #set(CMAKE_PREFIX_PATH /usr/lib)
 
@@ -19,3 +19,4 @@ add_subdirectory(src/airmap_node)
 add_subdirectory(src/unifly_node)
 add_subdirectory(src/sim_node)
 add_subdirectory(src/avoidance_node)
+#add_subdirectory(src/dronecode_sdk_node)
