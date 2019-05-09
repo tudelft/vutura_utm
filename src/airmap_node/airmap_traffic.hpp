@@ -131,7 +131,7 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 				if ((*it)["altitude"].get<std::string>() == "") {
 					// invalid
 					std::cout << "Invalid altitude" << std::endl;
-					//continue;
+					continue;
 				}
 				TrafficInfo tinfo;
 				tinfo.set_unique_id((*it)["id"].get<std::string>());
