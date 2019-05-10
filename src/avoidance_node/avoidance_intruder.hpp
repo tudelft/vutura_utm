@@ -23,7 +23,9 @@ public:
         double getVRel();
         double getD2Rel();
         double getDRel();
+        double getBearingRel();
         bool getInConf();
+        bool getAvoiding();
 
         void setData(double latd, double lond,
                         double alt, double hdgd,
@@ -33,6 +35,7 @@ public:
 
         // avoidance functions
         void setConflictPar(bool inconf, double t_cpa, double d_cpa, double d_in, double d_los, double t_los);
+        void setAvoiding(bool avoiding);
 private:
         // returns timestamp in seconds
         double getTimeStamp();
@@ -69,6 +72,7 @@ private:
 
         struct conflict {
                 bool inconf {false};
+                bool avoiding {false};
                 double t_cpa;
                 double d_cpa;
                 double d_in;

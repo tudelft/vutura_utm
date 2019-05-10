@@ -59,11 +59,20 @@ void Avoidance_intruder::updateRelVar(double lat_own, double lon_own, double alt
 void Avoidance_intruder::setConflictPar(bool inconf, double t_cpa, double d_cpa, double d_in, double d_los, double t_los)
 {
         _conflict.inconf = inconf;
+        if ((inconf == true) && (_conflict.avoiding == false))
+        {
+                _conflict.avoiding = true;
+        }
         _conflict.t_cpa = t_cpa;
         _conflict.d_cpa = d_cpa;
         _conflict.d_in = d_in;
         _conflict.d_los = d_los;
         _conflict.t_los = t_los;
+}
+
+void Avoidance_intruder::setAvoiding(bool avoiding)
+{
+        _conflict.avoiding = avoiding;
 }
 
 double Avoidance_intruder::getVn()
@@ -126,9 +135,19 @@ double Avoidance_intruder::getDRel()
         return _rel_var.dist;
 }
 
+double Avoidance_intruder::getBearingRel()
+{
+        return _rel_var.bearing;
+}
+
 bool Avoidance_intruder::getInConf()
 {
         return _conflict.inconf;
+}
+
+bool Avoidance_intruder::getAvoiding()
+{
+        return _conflict.avoiding;
 }
 
 void Avoidance_intruder::setData(double latd, double lond,

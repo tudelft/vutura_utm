@@ -70,6 +70,7 @@ int main(int argc, char* argv[])
     std::cout << "Instance " << std::to_string(instance) << std::endl;
 
 	AvoidanceNode node(instance, config, geometry);
+        node.InitialiseSSD();
 	EventLoop event_loop;
 
 	Timer periodic_timer(&node, 200, node.periodic_timer_callback);
