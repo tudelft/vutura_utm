@@ -20,7 +20,8 @@ UniflyNode::UniflyNode(int instance) :
 	_takeoff(false)
 {
 	// hard-coded for now, can also be requested through the api
-	_uas_uuid = "e6755d9f-1b83-4993-a121-aaeab695996a"; // vutura
+//	_uas_uuid = "e6755d9f-1b83-4993-a121-aaeab695996a"; // vutura iris
+	_uas_uuid = "2b5e3966-3eec-4758-92a4-af236c4f7978"; // vutura disco PH-4HM
 	_user_uuid = "e01c6f69-6107-456b-9031-6adc68afd24b"; // vutura
 //	_uas_uuid = "897f53b7-61f0-4bd8-b1c4-9bc9a98d64b4"; // parrot disco in podium
 //	_user_uuid = "67f8413e-10a4-48bf-9948-c3d2d532cdee"; // podium
@@ -530,7 +531,7 @@ uint64_t UniflyNode::get_timestamp()
 
 void UniflyNode::position_update_callback(EventSource *es)
 {
-	std::cout << "Got mavlink position" << std::endl;
+	//std::cout << "Got mavlink position" << std::endl;
 
 	UniflyNode *node = static_cast<UniflyNode*>(es->_target_object);
 	Subscription *sub = static_cast<Subscription*>(es);

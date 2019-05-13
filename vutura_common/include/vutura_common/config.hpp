@@ -4,6 +4,8 @@
 #define MAVLINK_SYSTEM_ID 255
 #define MAVLINK_IP			"127.0.0.1"
 #define MAVLINK_PORT			14557
+#define PPRZ_IP				"127.0.0.1"
+#define PPRZ_PORT			8200
 
 #define SOCK_PUBSUB_UTM_STATUS_UPDATE	"ipc:///tmp/utm_status_update"
 #define SOCK_PUBSUB_UAV_COMMAND		"ipc:///tmp/uav_command"
