@@ -15,7 +15,11 @@ add_subdirectory(vutura_common)
 
 
 add_subdirectory(src/mavlink_node)
-add_subdirectory(src/airmap_node)
+
+if (NOT ${PLATFORM} STREQUAL "Disco")
+	message("Compiling AIRMAP NODE")
+	add_subdirectory(src/airmap_node)
+endif()
 add_subdirectory(src/unifly_node)
 add_subdirectory(src/sim_node)
 add_subdirectory(src/avoidance_node)

@@ -83,7 +83,7 @@ int UniflyNode::request_flight()
 	nlohmann::json request;
 
 	// parse geofence file
-	std::string geometry_file = "/home/bart/unifly/geo_hoi.json";
+	std::string geometry_file = "geo_hoi.json";
 	nlohmann::json geometry;
 	if (geometry_file != "") {
 		try {

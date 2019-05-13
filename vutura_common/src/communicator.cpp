@@ -45,6 +45,8 @@ unsigned int Communicator::curl_post(const char *url, const curl_slist *headers,
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Communicator::writeFunction);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
 
 		res = curl_easy_perform(curl);
 		if (res != CURLE_OK) {
@@ -80,6 +82,8 @@ unsigned int Communicator::curl_multipart_post(const char *url, const curl_slist
 		curl_easy_setopt(curl, CURLOPT_HTTPPOST, post);
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Communicator::writeFunction);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
 
 		res = curl_easy_perform(curl);
 		if (res != CURLE_OK) {
@@ -102,6 +106,8 @@ unsigned int Communicator::curl_get(const char *url, const curl_slist *headers, 
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Communicator::writeFunction);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
 
 		res = curl_easy_perform(curl);
 		if (res != CURLE_OK) {
