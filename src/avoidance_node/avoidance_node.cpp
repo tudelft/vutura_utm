@@ -7,10 +7,13 @@
 #include "vutura_common/timer.hpp"
 #include "vutura_common/subscription.hpp"
 
+#include "vutura_common.pb.h"
+
 #include "avoidance_node.hpp"
 
 AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_geometry& geometry) :
 	_avoidance_req(this, socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance), avoidance_reply_callback),
+        _avoidance_pub(socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance)),
 	_avoidance_config(config),
 	_avoidance_geometry(geometry),
 	_gps_position_valid(false),
@@ -117,10 +120,6 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
         double delay = getTimeStamp() - recorded_time_i;
 //        std::cout << "Delay: " << delay << std::endl;
 
-//	if(alt_i > 120) {
-//		return 0;
-//	}
-
         // Check if traffic already exists in traffic vector
         bool intruder_match = false;
         for (Avoidance_intruder& intruder : _intruders)
@@ -146,23 +145,6 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
                 std::cerr << "Unknown position of self" << std::endl;
                 return -1;
         }
-
-	// check distance to self
-//	double x,y,dist;
-//      get_relative_coordinates(_lat, _lon, latd_i, lond_i, &x, &y);
-//	dist = sqrt(x * x + y * y);
-//	std::cout << "Traffic: " << std::to_string(x) << ", " << std::to_string(y) << "\tdist: " << dist << "\talt: " << alt_i << std::endl;
-
-        // Worst avoidance algorithm in the world:
-//	if (alt_i < 120 && dist < 2000) {
-//		_vx_sp = x/dist * 6;
-//		_vy_sp = y/dist * 6;
-//		_vz_sp = 0;
-
-//		_avoid = true;
-//	} else {
-//		//_avoid = false;
-//	}
 }
 
 int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
@@ -511,6 +493,13 @@ int AvoidanceNode::SSDResolution()
                 _ve_sp = Scale_from_clipper(vertices[0].w_e);
                 _vn_sp = Scale_from_clipper(vertices[1].w_n);
                 _avoid = true;
+
+                AvoidanceVelocity Avoidance_msg;
+                Avoidance_msg.set_vd(0);
+                Avoidance_msg.set_ve(static_cast<int>(_ve_sp * 1000.));
+                Avoidance_msg.set_vn(static_cast<int>(_vn_sp * 1000.));
+                Avoidance_msg.set_avoid(_avoid);
+                _avoidance_pub.publish(Avoidance_msg.SerializeAsString());
         }
         return 0;
 }
@@ -565,6 +554,12 @@ int AvoidanceNode::ResumeNav()
         if (_intr_avoid.size() == 0)
         {
                 _avoid = false;
+                AvoidanceVelocity Avoidance_msg;
+                Avoidance_msg.set_vd(0);
+                Avoidance_msg.set_ve(static_cast<int>(_ve_sp * 1000.));
+                Avoidance_msg.set_vn(static_cast<int>(_vn_sp * 1000.));
+                Avoidance_msg.set_avoid(_avoid);
+                _avoidance_pub.publish(Avoidance_msg.SerializeAsString());
                 std::cout << "Resuming Nav" << std::endl;
         }
 

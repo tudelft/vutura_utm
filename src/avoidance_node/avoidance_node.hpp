@@ -3,6 +3,7 @@
 #include "vutura_common/config.hpp"
 #include "vutura_common/udp_source.hpp"
 #include "vutura_common/requester.hpp"
+#include "vutura_common/publisher.hpp"
 
 #include "vutura_common.pb.h"
 
@@ -38,6 +39,8 @@ private:
         void statebased_CD(Avoidance_intruder& inntruder);
 
 	Requester _avoidance_req;
+        Publisher _avoidance_pub;
+
 	Avoidance_config& _avoidance_config;
         Avoidance_geometry& _avoidance_geometry;
 
