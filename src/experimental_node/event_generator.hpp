@@ -6,7 +6,7 @@ public:
 	EventGenerator();
 	virtual ~EventGenerator() = 0;
 
-	int fd;
+	virtual void pollin_event();
 
-	std::function<void(void)> callback = nullptr;
+	int fd;
 };

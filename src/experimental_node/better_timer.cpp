@@ -18,8 +18,6 @@ BetterTimer::BetterTimer(uint32_t interval_ms)
 		std::cerr << "ERROR setting periodic timer" << std::endl;
 	}
 
-	// Register the callback
-	callback = std::bind(&BetterTimer::pollin_event, this);
 }
 
 BetterTimer::~BetterTimer()

@@ -10,11 +10,7 @@ ExperimentalLoop::ExperimentalLoop()
 
 void ExperimentalLoop::add_event_generator(EventGenerator *eg)
 {
-	if (eg->callback == nullptr) {
-		std::cerr << "Callback not defined" << std::endl;
-	} else {
-		_event_sources.push_back(eg);
-	}
+	_event_sources.push_back(eg);
 }
 
 ExperimentalLoop::~ExperimentalLoop()
@@ -48,7 +44,7 @@ void ExperimentalLoop::run()
 		// check which event it was, and trigger the callback
 		for (ssize_t i = 0; i < len; i++) {
 			if (fds[i].revents & POLLIN) {
-				_event_sources.at(i)->callback();
+				_event_sources.at(i)->pollin_event();
 				continue;
 			}
 		}
