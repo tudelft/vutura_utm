@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <cmath>
+#include <iomanip>
 #include <algorithm>
 #include "sys/time.h"
 
@@ -17,6 +18,7 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_avoidance_config(config),
 	_avoidance_geometry(geometry),
 	_gps_position_valid(false),
+        _time_gps(0),
 	_lat(0),
 	_lon(0),
 	_alt(0),
@@ -27,6 +29,7 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
         _vn_sp(0),
         _ve_sp(0),
         _vd_sp(0),
+        _logging(false),
         _intruders()
 {
 
@@ -72,6 +75,47 @@ int AvoidanceNode::InitialiseSSD()
         return 0;
 }
 
+int AvoidanceNode::InitialiseLogger()
+{
+        _logging = _avoidance_config.getLogging();
+        if (_logging)
+        {
+                std::string prefix = _avoidance_config.getLogPrefix();
+                time_t t = time(NULL);
+                struct tm *tm = gmtime(&t);
+                std::string filename =  std::to_string(tm->tm_year + 1900) + "-" +
+                                        std::to_string(tm->tm_mon + 1) + "-" +
+                                        std::to_string(tm->tm_mday) + "-" +
+                                        std::to_string(tm->tm_hour) + "-" +
+                                        std::to_string(tm->tm_min) + "-" +
+                                        std::to_string(tm->tm_sec) + "_" + prefix;
+                _logfile.open("avoidance_logs/" + filename + ".log");
+                _logfile << std::setprecision(20);
+                _logfile << "# Configuration: t_lookahead = " << _avoidance_config.getTLookahead() <<
+                            ", t_pop_traffic = " << _avoidance_config.getTPopTraffic() <<
+                            ", r_px = " << _avoidance_config.getRPZ() <<
+                            ", r_pz_mar = " << _avoidance_config.getRPZMar() <<
+                            ", n_angle = " << _avoidance_config.getNAngle() <<
+                            ", v_min = " << _avoidance_config.getVMin() <<
+                            ", v_max = " << _avoidance_config.getVMax() <<
+                            ", v_set = " << _avoidance_config.getVSet() << "\n";
+                _logfile << "timelog, timegps, lat, lon, alt, vn, ve, vd, gps_valid, avoid_vn, avoid_ve, avoid_vd, avoid\n";
+
+                _traffic_logfile.open("avoidance_logs/" + filename + "_traffic.log");
+                _traffic_logfile << std::setprecision(20);
+                _traffic_logfile << "# Configuration: t_lookahead = " << _avoidance_config.getTLookahead() <<
+                            ", t_pop_traffic = " << _avoidance_config.getTPopTraffic() <<
+                            ", r_px = " << _avoidance_config.getRPZ() <<
+                            ", r_pz_mar = " << _avoidance_config.getRPZMar() <<
+                            ", n_angle = " << _avoidance_config.getNAngle() <<
+                            ", v_min = " << _avoidance_config.getVMin() <<
+                            ", v_max = " << _avoidance_config.getVMax() <<
+                            ", v_set = " << _avoidance_config.getVSet() << "\n";
+                _traffic_logfile << "timelog, acid, lat, lon, alt, hdg, groundspeed, recorded_time, delay\n";
+        }
+        return 0;
+}
+
 int AvoidanceNode::handle_periodic_timer()
 {
 	// every 200ms send velocity vector
@@ -100,6 +144,12 @@ int AvoidanceNode::handle_periodic_timer()
                 ResumeNav();
         }
 
+        // logging
+        if (_logging)
+        {
+                write_log();
+        }
+
 
 	return 0;
 }
@@ -118,6 +168,10 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
         double gs_i = traffic.groundspeed() * AVOIDANCE_KTS * 1e-3;
         double recorded_time_i = traffic.recorded_time();// * 1e-3;
         double delay = getTimeStamp() - recorded_time_i;
+        if (_logging)
+        {
+                write_traffic_log(aircraft_id_i, latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i, delay);
+        }
 //        std::cout << "Delay: " << delay << std::endl;
 
         // Check if traffic already exists in traffic vector
@@ -156,6 +210,7 @@ int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
         _ve = gps_info.ve() * 1e-3;
         _vd = gps_info.vd() * 1e-3;
 	_gps_position_valid = true;
+        _time_gps = getTimeStamp();
 
         update_position_params(_own_pos, _lat, _lon, _alt);
 	//std::cout << "Got GPS: " << std::to_string(gps_info.lat() * 1e-7) << ", " << std::to_string(gps_info.lon() * 1e-7) << std::endl;
@@ -250,6 +305,36 @@ void AvoidanceNode::avoidance_reply_callback(EventSource *es)
 	if (reply != "OK") {
 		std::cout << reply << std::endl;
 	}
+}
+
+void AvoidanceNode::write_log()
+{
+        _logfile << getTimeStamp() << ", " <<
+                    _time_gps << ", " <<
+                    _lat << ", " <<
+                    _lon << ", " <<
+                    _alt << ", " <<
+                    _vn << ", " <<
+                    _ve << ", " <<
+                    _vd << ", " <<
+                    _gps_position_valid << ", " <<
+                    _vn_sp << ", " <<
+                    _ve_sp << ", " <<
+                    _vd_sp << ", " <<
+                    _avoid << "\n";
+}
+
+void AvoidanceNode::write_traffic_log(std::string acid, double latd, double lond, double alt, double hdg, double gs, double recorded_time, double delay)
+{
+        _traffic_logfile << getTimeStamp() << ", " <<
+                            acid << ", " <<
+                            latd << ", " <<
+                            lond << ", " <<
+                            alt << ", " <<
+                            hdg << ", " <<
+                            gs << ", " <<
+                            recorded_time << ", " <<
+                            delay << "\n";
 }
 
 void AvoidanceNode::traffic_housekeeping(double t_pop_traffic)

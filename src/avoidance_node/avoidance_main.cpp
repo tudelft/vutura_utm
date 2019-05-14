@@ -71,6 +71,7 @@ int main(int argc, char* argv[])
 
 	AvoidanceNode node(instance, config, geometry);
         node.InitialiseSSD();
+        node.InitialiseLogger();
 	EventLoop event_loop;
 
 	Timer periodic_timer(&node, 200, node.periodic_timer_callback);

@@ -25,3 +25,6 @@ add_subdirectory(src/sim_node)
 add_subdirectory(src/pprz_node)
 add_subdirectory(src/avoidance_node)
 #add_subdirectory(src/dronecode_sdk_node)
+
+# creeate log folder
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/bin/avoidance_logs")

@@ -10,6 +10,7 @@
 #define AVOIDANCE_V_MIN 5.0
 #define AVOIDANCE_V_MAX 20.0
 #define AVOIDANCE_V_SET 12.0
+#define AVOIDANCE_LOGGING true
 
 class Avoidance_config {
 public:
@@ -24,6 +25,8 @@ public:
         double getVMin();
         double getVMax();
         double getVSet();
+        bool getLogging();
+        std::string getLogPrefix();
     
 private:
 
@@ -35,4 +38,6 @@ private:
         double _v_min;
         double _v_max;
         double _v_set;
+        bool _logging;
+        std::string _log_prefix;
 };

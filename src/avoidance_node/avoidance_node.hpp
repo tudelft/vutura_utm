@@ -1,4 +1,8 @@
 #pragma once
+
+#include <iostream>
+#include <fstream>
+
 #include "vutura_common/helper.hpp"
 #include "vutura_common/config.hpp"
 #include "vutura_common/udp_source.hpp"
@@ -22,6 +26,7 @@ public:
 
         // initialisation
         int InitialiseSSD();
+        int InitialiseLogger();
 
 	int handle_periodic_timer();
 	int handle_traffic(const TrafficInfo& traffic);
@@ -35,6 +40,8 @@ public:
 	static void avoidance_reply_callback(EventSource *es);
 
 private:
+        void write_log();
+        void write_traffic_log(std::string acid, double latd, double lond, double alt, double hdg, double gs, double recorded_time, double delay);
         void traffic_housekeeping(double t_pop_traffic);
         void statebased_CD(Avoidance_intruder& inntruder);
 
@@ -45,6 +52,7 @@ private:
         Avoidance_geometry& _avoidance_geometry;
 
         bool _gps_position_valid;
+        double _time_gps;
 	double _lat;
 	double _lon;
 	double _alt;
@@ -56,6 +64,10 @@ private:
         double _vn_sp;
         double _ve_sp;
         double _vd_sp;
+
+        bool _logging;
+        std::ofstream _logfile;
+        std::ofstream _traffic_logfile;
 
         position_params _own_pos;
 
