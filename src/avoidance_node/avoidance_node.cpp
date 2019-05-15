@@ -183,7 +183,7 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
                         intruder_match = true;
                         intruder.setData(latd_i, lond_i, alt_i, hdg_i, gs_i, recorded_time_i);
                         intruder.updateRelVar(_own_pos.lat, _own_pos.lon, _own_pos.alt, _vn, _ve, _own_pos.r);
-                        std::cout << "updating id: " << intruder.getAircraftId() << std::endl;
+                        //std::cout << "updating id: " << intruder.getAircraftId() << std::endl;
                         break;
                 }
         }
@@ -487,10 +487,11 @@ int AvoidanceNode::ConstructSSD()
                         double e2 = (sinqdr - cosqdrtanalpha) * 2. * _SSD_c.vmax;
                         double n1 = (cosqdr - sinqdrtanalpha) * 2. * _SSD_c.vmax;
                         double n2 = (cosqdr + sinqdrtanalpha) * 2. * _SSD_c.vmax;
+                        std::cout << "e1: " << e1 <<" e2: " << e2 << " n1: " << n1 << " n2: " << n2;
 
                         ClipperLib::Path VO_int;
                         VO_int << ClipperLib::IntPoint(Scale_to_clipper(ve_i), Scale_to_clipper(vn_i))
-                               << ClipperLib::IntPoint(Scale_to_clipper(e1 + ve_i), Scale_to_clipper(n1 + ve_i))
+                               << ClipperLib::IntPoint(Scale_to_clipper(e1 + ve_i), Scale_to_clipper(n1 + vn_i))
                                << ClipperLib::IntPoint(Scale_to_clipper(e2 + ve_i), Scale_to_clipper(n2 + vn_i));
                         VO_i_paths.push_back(VO_int);
                         c.AddPath(VO_i_paths.at(VO_i_paths.size() - 1), ClipperLib::ptClip, true);
@@ -618,7 +619,7 @@ int AvoidanceNode::ResumeNav()
                         past_cpa = true;
                 }
                 else {
-                        past_cpa = true;
+                        past_cpa = false;
                 }
 
                 // combine

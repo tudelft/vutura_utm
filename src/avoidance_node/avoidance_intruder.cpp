@@ -51,7 +51,7 @@ void Avoidance_intruder::updateRelVar(double lat_own, double lon_own, double alt
         _rel_var.v = sqrt(_rel_var.v2);
         _rel_var.dist2 = pow(_rel_var.pn, 2) + pow(_rel_var.pe, 2);
         _rel_var.dist = sqrt(_rel_var.dist2);
-        _rel_var.bearing = atan2(_rel_var.pe, _rel_var.pn);
+        _rel_var.bearing = atan2(-_rel_var.pe, -_rel_var.pn);
 
 //        std::cout << "Traffic \t ID: " << _aircaft_id << " \t (n, e): (" << _rel_var.pn << ", " << _rel_var.pe << ") \t dist: " << _rel_var.dist << " \t bearing: " << _rel_var.bearing << std::endl;
 }
