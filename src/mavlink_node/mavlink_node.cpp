@@ -1,36 +1,99 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <stdbool.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <poll.h>
-#include <sys/timerfd.h>
 #include <math.h>
-#include <string>
 #include <iostream>
 
-#include "mavlink_node.h"
-#include <mavlink.h>
+#include "mavlink_node.hpp"
 
 #include "vutura_common/helper.hpp"
-#include "vutura_common/event_loop.hpp"
-#include "vutura_common/udp_source.hpp"
-#include "vutura_common/timer.hpp"
-#include "vutura_common/subscription.hpp"
-#include "vutura_common/listener_replier.hpp"
 
 #include "vutura_common.pb.h"
 
-#define BUFFER_LENGTH 2041
+using namespace std::placeholders;
 
-void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg);
-
-void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg)
+MavlinkNode::MavlinkNode(int instance) :
+	_instance(instance),
+	_armed(false),
+	_guided_mode(false),
+	_avoiding(false),
+	_heartbeat_timer(this),
+	_mavlink_comm(this),
+	_uav_command_sub(this),
+	_avoidance_rep(this),
+	_gps_pub(socket_name(SOCK_PUBSUB_GPS_POSITION, instance)),
+	_uav_armed_pub(socket_name(SOCK_PUBSUB_UAV_STATUS, instance))
 {
-	// The message is in the buffer
+
+}
+
+MavlinkNode::~MavlinkNode()
+{
+
+}
+
+void MavlinkNode::init()
+{
+	_heartbeat_timer.set_timeout_callback(std::bind(&MavlinkNode::emit_heartbeat, this));
+	_heartbeat_timer.start_periodic(1000);
+
+	_mavlink_comm.set_receive_callback(std::bind(&MavlinkNode::handle_udp_packet, this, _1));
+	_mavlink_comm.connect(MAVLINK_IP, MAVLINK_PORT, 14551);
+
+	_uav_command_sub.set_receive_callback(std::bind(&MavlinkNode::uav_command, this, _1));
+	_uav_command_sub.subscribe(socket_name(SOCK_PUBSUB_UAV_COMMAND, _instance));
+
+	_avoidance_rep.set_receive_callback(std::bind(&MavlinkNode::handle_avoidance_command, this, _1, _2));
+	_avoidance_rep.listen(socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, _instance));
+}
+
+void MavlinkNode::uav_command(std::string command)
+{
+	if (command == "start mission") {
+		std::cout << "Should start mission now." << std::endl;
+		mavlink_message_t msg;
+		mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_MISSION_START, 0, 0, 0, 0, 0, 0, 0, 0);
+		uint16_t len = mavlink_msg_to_send_buffer(_buffer, &msg);
+		std::string packet((char*)_buffer, len);
+		_mavlink_comm.send_packet(packet);
+
+	} else if (command == "HB") {
+		// do nothing
+
+	} else {
+		std::cout << "Received: " << command << std::endl;
+	}
+}
+
+void MavlinkNode::emit_heartbeat()
+{
+	mavlink_message_t msg;
+	mavlink_msg_heartbeat_pack(255, 200, &msg, MAV_TYPE_GCS, MAV_AUTOPILOT_GENERIC, MAV_MODE_GUIDED_ARMED, 0, MAV_STATE_ACTIVE);
+	uint16_t len = mavlink_msg_to_send_buffer(_buffer, &msg);
+
+	std::string packet((char*)_buffer, len);
+	_mavlink_comm.send_packet(packet);
+
+	//printf("[%s] sent heartbeat %d bytes\n", node->name, bytes_sent);
+}
+
+void MavlinkNode::handle_udp_packet(std::string packet)
+{
+	const char* packet_buffer = packet.data();
+
+	mavlink_message_t msg;
+	mavlink_status_t status;
+
+	for (ssize_t i = 0; i < packet.length(); i++) {
+		if (mavlink_parse_char(MAVLINK_COMM_0, packet_buffer[i], &msg, &status)) {
+			handle_mavlink_message(&msg);
+		}
+	}
+}
+
+void MavlinkNode::handle_mavlink_message(mavlink_message_t *msg)
+{
 	//printf("[%s] incoming msg SYS: %d, COMP: %d, LEN: %d, MSGID: %d\n", node->name, msg->sysid, msg->compid, msg->len, msg->msgid);
+
 	if (msg->msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
 		mavlink_global_position_int_t global_pos;
 		mavlink_msg_global_position_int_decode(msg, &global_pos);
@@ -55,45 +118,39 @@ void mavlink_node_incoming_message(MavlinkNode *node, mavlink_message_t *msg)
 		gps_message.set_ve(global_pos.vy * 10);
 		gps_message.set_vd(global_pos.vz * 10);
 
-		node->gps_pub.publish(gps_message.SerializeAsString());
+		std::string gps_message_string = gps_message.SerializeAsString();
+		_gps_pub.publish(gps_message_string);
 
-		//printf("Writing %d serialized bytes\n", len);
 	} else if (msg->msgid == MAVLINK_MSG_ID_HEARTBEAT) {
-//		printf("HB\n");
+		// std::cout << "HB received" << std::endl;
 		// check if vehicle is armed
 		mavlink_heartbeat_t hb;
 		mavlink_msg_heartbeat_decode(msg, &hb);
 
-		node->set_armed_state(hb.system_status == MAV_STATE_ACTIVE);
-		node->set_guided_state(hb.base_mode & MAV_MODE_FLAG_GUIDED_ENABLED);
+		set_armed_state(hb.system_status == MAV_STATE_ACTIVE);
+		set_guided_state(hb.base_mode & MAV_MODE_FLAG_GUIDED_ENABLED);
 	}
 }
 
-void MavlinkNode::uav_command(std::string command)
+void MavlinkNode::handle_avoidance_command(std::string request, std::string &reply)
 {
-	if (command == "start mission") {
-		std::cout << "Should start mission now." << std::endl;
-		mavlink_message_t msg;
-		mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_MISSION_START, 0, 0, 0, 0, 0, 0, 0, 0);
-		uint16_t len = mavlink_msg_to_send_buffer(mavlink_comm.buf, &msg);
-		mavlink_comm.send_buffer(len);
-
-	} else if (command == "HB") {
-		// do nothing
-
-	} else {
-		std::cout << "Received: " << command << std::endl;
+	 //Assume that this was an avoidance velocity message
+	AvoidanceVelocity avoidance_msg;
+	try {
+		bool success = avoidance_msg.ParseFromString(request);
+		if (success) {
+			reply = "OK";
+//			std::cout << "vx: " << std::to_string(avoidance_msg.vx()) << std::endl;
+//			std::cout << "vy: " << std::to_string(avoidance_msg.vy()) << std::endl;
+//			std::cout << "vz: " << std::to_string(avoidance_msg.vz()) << std::endl;
+		}
+	} catch (...) {
+		std::cerr << "Error parsing avoidance command" << std::endl;
 	}
-}
 
-void MavlinkNode::emit_heartbeat()
-{
-	// Probably want to emit a heartbeat now
-	mavlink_message_t msg;
-	mavlink_msg_heartbeat_pack(255, 200, &msg, MAV_TYPE_GCS, MAV_AUTOPILOT_GENERIC, MAV_MODE_GUIDED_ARMED, 0, MAV_STATE_ACTIVE);
-	uint16_t len = mavlink_msg_to_send_buffer(mavlink_comm.buf, &msg);
-	mavlink_comm.send_buffer(len);
-	//printf("[%s] sent heartbeat %d bytes\n", node->name, bytes_sent);
+	// do something with it
+	avoidance_velocity_vector(avoidance_msg.avoid(), 0.001 * avoidance_msg.vn(), 0.001 * avoidance_msg.ve(), 0.001 * avoidance_msg.vd());
+
 }
 
 void MavlinkNode::avoidance_velocity_vector(bool avoid, float vn, float ve, float vd)
@@ -119,15 +176,17 @@ void MavlinkNode::avoidance_velocity_vector(bool avoid, float vn, float ve, floa
 			POSITION_TARGET_TYPEMASK_AY_IGNORE |
 			POSITION_TARGET_TYPEMASK_AZ_IGNORE |
 			POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE;
-        offboard_target.vx = vn;
-        offboard_target.vy = ve;
-        offboard_target.vz = vd;
+	offboard_target.vx = vn;
+	offboard_target.vy = ve;
+	offboard_target.vz = vd;
 	offboard_target.yaw = atan2(offboard_target.vy, offboard_target.vx);
 
 	mavlink_message_t msg;
 	mavlink_msg_set_position_target_local_ned_encode(255, 200, &msg, &offboard_target);
-	uint16_t len = mavlink_msg_to_send_buffer(mavlink_comm.buf, &msg);
-	mavlink_comm.send_buffer(len);
+	uint16_t len = mavlink_msg_to_send_buffer(_buffer, &msg);
+
+	std::string packet((char*)_buffer, len);
+	_mavlink_comm.send_packet(packet);
 
 	// Enable avoidance mode, only allowed during missions (guided mode)
 	if (_guided_mode) {
@@ -147,7 +206,8 @@ void MavlinkNode::set_armed_state(bool armed)
 
 		UavHeartbeat uavhb;
 		uavhb.set_armed(_armed);
-		uav_armed_pub.publish(uavhb.SerializeAsString());
+		std::string message_string = uavhb.SerializeAsString();
+		_uav_armed_pub.publish(message_string);
 
 	}
 }
@@ -180,98 +240,8 @@ void MavlinkNode::enable_offboard(bool offboard)
 	std::cout << "Sending offboard mode " << std::to_string(command_msg.param1) << std::endl;
 
 	mavlink_msg_command_long_encode(255, 200, &msg, &command_msg);
-	uint16_t len = mavlink_msg_to_send_buffer(mavlink_comm.buf, &msg);
-	mavlink_comm.send_buffer(len);
-}
+	uint16_t len = mavlink_msg_to_send_buffer(_buffer, &msg);
 
-void MavlinkNode::mavlink_comm_callback(EventSource *es) {
-	UdpSource *udp = static_cast<UdpSource*>(es);
-	MavlinkNode *node = static_cast<MavlinkNode*>(udp->_target_object);
-	memset(udp->buf, 0, BUFFER_LENGTH);
-	ssize_t recv_size = recv(udp->_fd, (void *)udp->buf, BUFFER_LENGTH, 0);
-	if (recv_size > 0) {
-		mavlink_message_t msg;
-		mavlink_status_t status;
-
-		for (ssize_t i = 0; i < recv_size; i++) {
-			if (mavlink_parse_char(MAVLINK_COMM_0, udp->buf[i], &msg, &status)) {
-				mavlink_node_incoming_message(node, &msg);
-			}
-		}
-	}
-}
-
-void MavlinkNode::heartbeat_timer_callback(EventSource *es) {
-	// read the timer
-	uint64_t num_timer_events;
-	ssize_t recv_size = read(es->_fd, &num_timer_events, 8);
-	(void) recv_size;
-
-	Timer *tim = static_cast<Timer*>(es);
-	MavlinkNode *node = static_cast<MavlinkNode*>(tim->_target_object);
-	node->emit_heartbeat();
-}
-
-void MavlinkNode::uav_command_callback(EventSource *es)
-{
-	Subscription *rep = static_cast<Subscription*>(es);
-	MavlinkNode *node = static_cast<MavlinkNode*>(rep->_target_object);
-	std::string message = rep->get_message();
-
-	node->uav_command(message);
-}
-
-void MavlinkNode::avoidance_command_callback(EventSource *es)
-{
-	ListenerReplier *rep = static_cast<ListenerReplier*>(es);
-	MavlinkNode *node = static_cast<MavlinkNode*>(rep->_target_object);
-	std::string message = rep->get_message();
-
-	// Assume that this was an avoidance velocity message
-	AvoidanceVelocity avoidance_msg;
-	std::string response = "OK";
-	try {
-		bool success = avoidance_msg.ParseFromString(message);
-		if (!success) {
-			response = "NOTOK";
-		} else {
-//			std::cout << "vx: " << std::to_string(avoidance_msg.vx()) << std::endl;
-//			std::cout << "vy: " << std::to_string(avoidance_msg.vy()) << std::endl;
-//			std::cout << "vz: " << std::to_string(avoidance_msg.vz()) << std::endl;
-		}
-	} catch (...) {
-		std::cerr << "Error parsing avoidance command" << std::endl;
-		response = "NOTOK";
-	}
-
-	rep->send_response(response);
-
-	// do something with it
-        node->avoidance_velocity_vector(avoidance_msg.avoid(), 0.001 * avoidance_msg.vn(), 0.001 * avoidance_msg.ve(), 0.001 * avoidance_msg.vd());
-
-}
-
-int main(int argc, char **argv)
-{
-	int instance = 0;
-	if (argc > 1) {
-		instance = atoi(argv[1]);
-	}
-	std::cout << "Instance " << std::to_string(instance) << std::endl;
-
-	EventLoop event_loop;
-
-	MavlinkNode node(instance);
-	event_loop.add(node.mavlink_comm);
-
-	Timer heartbeat_timer(&node, 1000, node.heartbeat_timer_callback);
-	event_loop.add(heartbeat_timer);
-
-	Subscription uav_command_sub(&node, socket_name(SOCK_PUBSUB_UAV_COMMAND, instance), node.uav_command_callback);
-	event_loop.add(uav_command_sub);
-
-	ListenerReplier avoidance_rep(&node, socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance), node.avoidance_command_callback);
-	event_loop.add(avoidance_rep);
-
-	event_loop.start();
+	std::string packet((char*)_buffer, len);
+	_mavlink_comm.send_packet(packet);
 }
