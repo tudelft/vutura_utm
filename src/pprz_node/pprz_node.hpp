@@ -4,6 +4,7 @@
 #include "vutura_common/config.hpp"
 #include "vutura_common/udp_source.hpp"
 #include "vutura_common/publisher.hpp"
+#include "vutura_common.pb.h"
 
 union paparazzi_to_vutura_msg_t {
 	struct {
@@ -18,18 +19,32 @@ union paparazzi_to_vutura_msg_t {
 } __attribute((__packed__));
 typedef union paparazzi_to_vutura_msg_t PaparazziToVuturaMsg;
 
+union vutura_to_paparazzi_msg_t {
+        struct  {
+                bool avoid;
+                int32_t vn;
+                int32_t ve;
+                int32_t vd;
+        };
+        unsigned char bytes;
+} __attribute((__packed__));
+typedef union vutura_to_paparazzi_msg_t VuturaToPaparazziMsg;
+
 class PaparazziNode {
 public:
 	PaparazziNode(int instance);
 	~PaparazziNode();
 
-	static void gpos_callback(EventSource* es);
+        static void pprz_callback(EventSource* es);
+        static void avoidance_command_callback(EventSource* es);
 
-	UdpSource gpos_source;
+        UdpSource pprz_comm;
 	Publisher position_publisher;
 
 private:
 	int _instance;
 
 	PaparazziToVuturaMsg _gpos_msg;
+
+        int handle_avoidance(AvoidanceVelocity avoidance_velocity);
 };

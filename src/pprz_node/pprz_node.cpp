@@ -1,11 +1,12 @@
 #include "pprz_node.hpp"
 #include <unistd.h>
 #include <string.h>
-#include "vutura_common.pb.h"
+
+#include "vutura_common/subscription.hpp"
 
 PaparazziNode::PaparazziNode(int instance) :
 	_instance(instance),
-	gpos_source(this, PPRZ_IP, PPRZ_PORT, gpos_callback),
+        pprz_comm(this, PPRZ_IP, PPRZ_PORT, pprz_callback),
 	position_publisher(socket_name(SOCK_PUBSUB_GPS_POSITION, instance))
 {
 
@@ -16,12 +17,12 @@ PaparazziNode::~PaparazziNode()
 
 }
 
-void PaparazziNode::gpos_callback(EventSource *es)
+void PaparazziNode::pprz_callback(EventSource *es)
 {
 	std::cout << "Got UDP data" << std::endl;
 	UdpSource *udp = static_cast<UdpSource*>(es);
 	PaparazziNode *node = static_cast<PaparazziNode*>(udp->_target_object);
-	memset(udp->buf, 0, BUFFER_LENGTH);
+        memset(udp->buf, 0, BUFFER_LENGTH);
 	ssize_t recv_size = recv(udp->_fd, (void*)&node->_gpos_msg, sizeof(PaparazziToVuturaMsg), 0);
 	if (recv_size == 24) {
 		GPSMessage msg;
@@ -45,3 +46,33 @@ void PaparazziNode::gpos_callback(EventSource *es)
 	}
 }
 
+void PaparazziNode::avoidance_command_callback(EventSource *es)
+{
+
+        Subscription* avoidance_sub = static_cast<Subscription*>(es);
+        PaparazziNode* node = static_cast<PaparazziNode*>(es->_target_object);
+
+        std::string message = avoidance_sub->get_message();
+        AvoidanceVelocity avoidance_velocity;
+        bool success = avoidance_velocity.ParseFromString(message);
+        if (success)
+        {
+                node->handle_avoidance(avoidance_velocity);
+        }
+
+}
+
+int PaparazziNode::handle_avoidance(AvoidanceVelocity avoidance_velocity)
+{
+        VuturaToPaparazziMsg msg;
+        msg.avoid = avoidance_velocity.avoid();
+        msg.vn = avoidance_velocity.vn();
+        msg.ve = avoidance_velocity.ve();
+        msg.vd = avoidance_velocity.vd();
+
+        std::cout << "TEST: " << msg.vn << std::endl;
+
+        sendto(pprz_comm._fd, &msg, sizeof(msg), 0, (struct sockaddr*)&pprz_comm.uav_addr, sizeof(struct sockaddr_in));
+
+        return 0;
+}

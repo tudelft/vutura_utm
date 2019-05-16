@@ -13,7 +13,7 @@
 #include "avoidance_node.hpp"
 
 AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_geometry& geometry) :
-	_avoidance_req(this, socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance), avoidance_reply_callback),
+        //_avoidance_req(this, socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance), avoidance_reply_callback),
         _avoidance_pub(socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance)),
 	_avoidance_config(config),
 	_avoidance_geometry(geometry),
@@ -118,14 +118,15 @@ int AvoidanceNode::InitialiseLogger()
 
 int AvoidanceNode::handle_periodic_timer()
 {
-	// every 200ms send velocity vector
+        // every 200ms send velocity vector if a packet was missing
 	AvoidanceVelocity avoidance_velocity;
-	avoidance_velocity.set_avoid(_avoid);
+        avoidance_velocity.set_avoid(_avoid);
         avoidance_velocity.set_vn(_vn_sp * 1000);
         avoidance_velocity.set_ve(_ve_sp * 1000);
         avoidance_velocity.set_vd(_vd_sp * 1000);
 	std::string request = avoidance_velocity.SerializeAsString();
-	_avoidance_req.send_request(request);
+        //_avoidance_req.send_request(request);
+        _avoidance_pub.publish(request);
 
         // perform traffic housekeeping
         traffic_housekeeping(_avoidance_config.getTPopTraffic());

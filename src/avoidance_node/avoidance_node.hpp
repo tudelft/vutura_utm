@@ -45,7 +45,7 @@ private:
         void traffic_housekeeping(double t_pop_traffic);
         void statebased_CD(Avoidance_intruder& inntruder);
 
-	Requester _avoidance_req;
+        //Requester _avoidance_req;
         Publisher _avoidance_pub;
 
 	Avoidance_config& _avoidance_config;
