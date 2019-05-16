@@ -6,7 +6,7 @@
 #include "airmap_config.h"
 #include "mqtt/async_client.h"
 #include "nlohmann/json.hpp"
-#include "vutura_common/vutura_common.pb.h"
+#include "vutura_common.pb.h"
 
 
 const int	QOS = 1;

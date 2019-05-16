@@ -5,7 +5,9 @@ find_package(Protobuf REQUIRED)
 find_package(nng CONFIG REQUIRED)
 
 file(GLOB SRCS
-	"src/*.cpp"
+	"src/communicator.cpp"
+	"src/config.cpp"
+	"src/helper.cpp"
 	)
 
 file(GLOB HDRS

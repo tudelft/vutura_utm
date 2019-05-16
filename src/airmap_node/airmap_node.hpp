@@ -1,4 +1,5 @@
-#pragma once
+#ifndef AIRMAP_NODE_HPP
+#define AIRMAP_NODE_HPP
 
 #include <nlohmann/json.hpp>
 #include "airmap_communicator.hpp"
@@ -6,9 +7,13 @@
 #include "encryptor.hpp"
 #include "buffer.hpp"
 
-#include "vutura_common/publisher.hpp"
+#include "nng_event_loop/event_loop.hpp"
+#include "nng_event_loop/timer.hpp"
+#include "nng_event_loop/replier.hpp"
+#include "nng_event_loop/subscriber.hpp"
+#include "nng_event_loop/publisher.hpp"
 
-class AirmapNode {
+class AirmapNode : public EventLoop {
 public:
 	enum AirmapState {
 		STATE_INIT,
@@ -20,8 +25,12 @@ public:
 
 	AirmapNode(int instance);
 
+	void init();
+	void handle_utm_sp(std::string request, std::string &reply);
+	void handle_position_update(std::string message);
+	void handle_uav_hb(std::string message);
 	void update_state(AirmapState new_state);
-	int start();
+	int login();
 	int request_flight();
 	int periodic();
 	int start_flight();
@@ -36,6 +45,7 @@ public:
 
 private:
 
+	int _instance;
 	AirmapState _state;
 
 	bool has_position_data() { return _has_position_data; }
@@ -46,6 +56,11 @@ private:
 	std::string _cipher;
 	std::vector<std::uint8_t> _iv;
 	Buffer _payload;
+
+	Timer _periodic_timer;
+	Replier _utm_sp;
+	Subscriber _gps_position;
+	Subscriber _uav_hb;
 
 	Publisher _pub_utm_status_update;
 	Publisher _pub_uav_command;
@@ -68,3 +83,4 @@ private:
 	nlohmann::json _geometry;
 };
 
+#endif // AIRMAP_NODE_HPP
