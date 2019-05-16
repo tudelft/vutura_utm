@@ -1,3 +1,6 @@
 [submodule "include/mavlink"]
 	path = src/mavlink_node/mavlink
 	url = https://github.com/mavlink/c_library_v2.git
+[submodule "nng_event_loop"]
+	path = nng_event_loop
+	url = https://github.com/bartslinger/nng_event_loop.git
