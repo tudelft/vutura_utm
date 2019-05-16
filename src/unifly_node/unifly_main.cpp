@@ -1,60 +1,58 @@
 #include <unistd.h>
 
-
-#include "unifly_config.h"
+#include "vutura_common/cxxopts.hpp"
 #include "vutura_common/config.hpp"
 #include "vutura_common/vutura_common.pb.h"
-#include "vutura_common/listener_replier.hpp"
-#include "vutura_common/subscription.hpp"
-#include "vutura_common/timer.hpp"
-#include "vutura_common/publisher.hpp"
-#include "vutura_common/event_loop.hpp"
 
 #include "unifly_node.hpp"
 
-
-namespace unifly {
-	std::string username;
-	std::string password;
-	std::string client_id;
-	std::string secret;
-} // namespace airmap
-
-void handle_periodic_timer(EventSource* es) {
-	UniflyNode *node = static_cast<UniflyNode*>(es->_target_object);
-	uint64_t num_timer_events;
-	ssize_t recv_size = read(es->_fd, &num_timer_events, 8);
-	(void) recv_size;
-
-	node->periodic();
-}
-
-// main
 int main(int argc, char* argv[])
 {
-	UniflyNode node(0);
+	int instance = 0;
+	std::string config_file = "";
+	std::string geometry_file = "";
 
-	EventLoop eventloop;
+	try
+	{
+		cxxopts::Options options(argv[0], " - Unifly Vutura Node");
+		options
+				.positional_help("[optional args]")
+				.show_positional_help();
 
-	/*
-	ListenerReplier utmsp(&node, SOCK_REQREP_UTMSP_COMMAND, handle_utmsp_update);
-	eventloop.add(utmsp);
+		options
+				.add_options()
+				("i,instance", "Instance number, used for running multiple instances", cxxopts::value<int>(instance), "N")
+				("c,config", "Unifly configuration file", cxxopts::value<std::string>(config_file), "FILE")
+				("g,geometry", "GeoJSON Geometry file", cxxopts::value<std::string>(geometry_file), "FILE")
+				("help", "Print help")
+				;
 
-	Subscription gps_position(&node, SOCK_PUBSUB_GPS_POSITION, handle_position_update);
-	eventloop.add(gps_position);
+		auto result = options.parse(argc, argv);
 
-	Subscription uav_hb(&node, SOCK_PUBSUB_UAV_STATUS, handle_uav_hb);
-	eventloop.add(uav_hb);
+		if (result.count("help"))
+		{
+			std::cout << options.help() << std::endl;
+			exit(0);
+		}
 
-	*/
-	Timer periodic_timer(&node, 500, handle_periodic_timer);
-	eventloop.add(periodic_timer);
+		if (result.count("c")) {
+			// parse config
+			std::cout << "Using config file: " << config_file << std::endl;
+		}
 
-	eventloop.add(node.gps_position_sub);
-	eventloop.add(node.command_listener);
+	} catch (const cxxopts::OptionException& e)
+	{
+		std::cout << "error parsing options: " << e.what() << std::endl;
+		exit(1);
+	}
 
-	node.start();
-	eventloop.start();
+	std::cout << "Instance " << std::to_string(instance) << std::endl;
+
+	UniflyConfig config(config_file);
+	UniflyNode node(instance, &config);
+
+	node.init();
+	node.run();
 
 	return 0;
 }

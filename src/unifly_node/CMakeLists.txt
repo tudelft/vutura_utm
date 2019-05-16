@@ -15,4 +15,4 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../../> # for vutura_common
 	)
 
-target_link_libraries(${PROJECT_NAME} vutura_common ${Curl_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} vutura_common nng_event_loop nlohmann_json ${Curl_LIBRARIES})
