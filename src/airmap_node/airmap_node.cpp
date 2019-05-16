@@ -16,21 +16,23 @@
 #include "airmap_config.h"
 #include "vutura_common/helper.hpp"
 #include "vutura_common/config.hpp"
-#include "vutura_common/vutura_common.pb.h"
-#include "vutura_common/listener_replier.hpp"
-#include "vutura_common/subscription.hpp"
-#include "vutura_common/timer.hpp"
-#include "vutura_common/publisher.hpp"
-#include "vutura_common/event_loop.hpp"
+#include "vutura_common.pb.h"
 #include "airmap_traffic.hpp"
 
 #include "airmap_node.hpp"
 
+using namespace std::placeholders;
+
 AirmapNode::AirmapNode(int instance) :
+	_instance(instance),
 	_autostart_flight(false),
 	_state(STATE_INIT),
 	_communicator(airmap::api_key),
 	_udp(AIRMAP_TELEM_HOST, AIRMAP_TELEM_PORT),
+	_periodic_timer(this),
+	_utm_sp(this),
+	_gps_position(this),
+	_uav_hb(this),
 	_pub_utm_status_update(socket_name(SOCK_PUBSUB_UTM_STATUS_UPDATE, instance)),
 	_pub_uav_command(socket_name(SOCK_PUBSUB_UAV_COMMAND, instance)),
 	_traffic(instance),
@@ -45,6 +47,69 @@ AirmapNode::AirmapNode(int instance) :
 	_geometry(nullptr)
 {
 
+}
+
+void AirmapNode::init()
+{
+	login();
+
+	_periodic_timer.set_timeout_callback(std::bind(&AirmapNode::periodic, this));
+	_periodic_timer.start_periodic(2000);
+
+	_utm_sp.set_receive_callback(std::bind(&AirmapNode::handle_utm_sp, this, _1, _2));
+	_utm_sp.listen(socket_name(SOCK_REQREP_UTMSP_COMMAND, _instance));
+
+	_gps_position.set_receive_callback(std::bind(&AirmapNode::handle_position_update, this, _1));
+	_gps_position.subscribe(socket_name(SOCK_PUBSUB_GPS_POSITION, _instance));
+
+	_uav_hb.set_receive_callback(std::bind(&AirmapNode::handle_uav_hb, this, _1));
+	_uav_hb.subscribe(socket_name(SOCK_PUBSUB_UAV_STATUS, _instance));
+}
+
+void AirmapNode::handle_utm_sp(std::string request, std::string &reply)
+{
+
+	_autostart_flight = false;
+	if (request == "request_flight") {
+		request_flight();
+
+	} else if (request == "start_flight") {
+		start_flight();
+
+	} else if (request == "autostart_flight") {
+		_autostart_flight = true;
+		start_flight();
+
+	} else if (request == "end_flight") {
+		end_flight();
+
+	} else if (request == "get_brief") {
+		get_brief();
+
+	}
+
+	reply = "OK";
+}
+
+void AirmapNode::handle_position_update(std::string message)
+{
+	// unpack msg
+	GPSMessage gps_msg;
+	gps_msg.ParseFromString(message);
+
+	if (gps_msg.has_lat() && gps_msg.has_lon()) {
+		set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7, gps_msg.alt_msl() * 1e-3, gps_msg.alt_agl() * 1e-3);
+		//std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
+	}
+}
+
+void AirmapNode::handle_uav_hb(std::string message)
+{
+	// unpack msg
+	UavHeartbeat hb;
+	hb.ParseFromString(message);
+
+	set_armed(hb.armed());
 }
 
 void AirmapNode::update_state(AirmapNode::AirmapState new_state) {
@@ -82,7 +147,7 @@ void AirmapNode::update_state(AirmapNode::AirmapState new_state) {
 	_pub_utm_status_update.publish(state);
 }
 
-int AirmapNode::start() {
+int AirmapNode::login() {
 	if (-1 == _communicator.authenticate()) {
 		std::cout << "Authentication Failed!" << std::endl;
 		exit(EXIT_FAILURE);
@@ -156,7 +221,8 @@ uint64_t AirmapNode::getTimeStamp() {
 
 int AirmapNode::set_armed(bool armed)
 {
-	_pub_uav_command.publish("HB");
+	std::string hb = "HB";
+	_pub_uav_command.publish(hb);
 	if (!armed) {
 		// disarm event
 		std::cout << "Disarm event" << std::endl;
