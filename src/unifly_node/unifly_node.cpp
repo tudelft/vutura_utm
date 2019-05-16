@@ -5,13 +5,16 @@
 #include <nlohmann/json.hpp>
 
 #include <vutura_common/config.hpp>
-#include "unifly_config.h"
 #include "unifly_node.hpp"
 
+using namespace std::placeholders;
 
-UniflyNode::UniflyNode(int instance) :
-	gps_position_sub(this, socket_name(SOCK_PUBSUB_GPS_POSITION, instance), position_update_callback),
-	command_listener(this, socket_name(SOCK_REQREP_UTMSP_COMMAND, instance), command_callback),
+UniflyNode::UniflyNode(int instance, UniflyConfig *config) :
+	_instance(instance),
+	_config(config),
+	_periodic_timer(this),
+	_gps_position_sub(this),
+	_command_replier(this),
 	_lat(0.0),
 	_lon(0.0),
 	_alt_msl(0.0),
@@ -24,18 +27,67 @@ UniflyNode::UniflyNode(int instance) :
 	_uas_uuid = "2b5e3966-3eec-4758-92a4-af236c4f7978"; // vutura disco PH-4HM
 	_user_uuid = "e01c6f69-6107-456b-9031-6adc68afd24b"; // vutura
 //	_uas_uuid = "897f53b7-61f0-4bd8-b1c4-9bc9a98d64b4"; // parrot disco in podium
-//	_user_uuid = "67f8413e-10a4-48bf-9948-c3d2d532cdee"; // podium
+	//	_user_uuid = "67f8413e-10a4-48bf-9948-c3d2d532cdee"; // podium
 }
 
-int UniflyNode::start()
+int UniflyNode::init()
 {
-	std::string url = "https://" UNIFLY_SSO_HOST "/oauth/token";
+	login();
+
+	_periodic_timer.set_timeout_callback(std::bind(&UniflyNode::periodic, this));
+	_periodic_timer.start_periodic(500);
+
+	_gps_position_sub.set_receive_callback(std::bind(&UniflyNode::handle_gps_position, this, _1));
+	_gps_position_sub.subscribe(socket_name(SOCK_PUBSUB_GPS_POSITION, _instance));
+
+	_command_replier.set_receive_callback(std::bind(&UniflyNode::handle_command, this, _1, _2));
+	_command_replier.listen(socket_name(SOCK_REQREP_UTMSP_COMMAND, _instance));
+}
+
+void UniflyNode::handle_gps_position(std::string message)
+{
+	// unpack msg
+	GPSMessage gps_msg;
+	gps_msg.ParseFromString(message);
+
+	if (gps_msg.has_lat() && gps_msg.has_lon()) {
+		set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7, gps_msg.alt_msl() * 1e-3, gps_msg.alt_agl() * 1e-3);
+	}
+}
+
+void UniflyNode::handle_command(std::string request, std::string &reply)
+{
+	if (request == "land") {
+		reply = "LANDING";
+		send_land();
+
+	} else if (request == "takeoff") {
+		reply = "taking off";
+		send_takeoff();
+
+	} else if (request == "action_items") {
+		reply = "getting action items";
+		get_action_items();
+
+	} else if (request == "cancel") {
+		reply = "cancelling";
+		send_cancel_permission();
+
+	} else if (request == "get_traffic_channels") {
+		reply = "getting channels";
+		get_traffic_channels();
+	}
+}
+
+int UniflyNode::login()
+{
+	std::string url = "https://" + _config->host() + "/oauth/token";
 	_comm.clear_headers();
 	_comm.add_header("content-type", "application/x-www-form-urlencoded");
-	_comm.add_header("authorization", "Basic " UNIFLY_SECRET);
+	_comm.add_header("authorization", "Basic " + _config->secret());
 	_comm.add_header("accept", "application/json");
 
-	std::string request_body = "username=" UNIFLY_USERNAME "&password=" UNIFLY_PASSWORD "&grant_type=password";
+	std::string request_body = "username=" + _config->username() + "&password=" + _config->password() + "&grant_type=password";
 
 	std::string res;
 	_comm.post(url.c_str(), request_body.c_str(), res);
@@ -122,7 +174,7 @@ int UniflyNode::request_flight()
 	_comm.add_header("authorization", "Bearer " + _access_token);
 	_comm.add_header("content-type", "application/vnd.geo+json");
 
-	std::string url = "https://" UNIFLY_HOST "/api/uasoperations";
+	std::string url = "https://" + _config->host() +  "/api/uasoperations";
 
 
 	std::string postfields = request.dump();
@@ -156,7 +208,7 @@ int UniflyNode::request_flight()
 
 int UniflyNode::get_user_id()
 {
-	std::string url = "https://" UNIFLY_HOST "/api/operator/users/me";
+	std::string url = "https://" + _config->host() +  "/api/operator/users/me";
 
 	std::string res;
 	_comm.get(url.c_str(), res);
@@ -184,7 +236,7 @@ int UniflyNode::get_validation_results()
 			std::cerr << "Unique Identifier for operation not set" << std::endl;
 		}
 
-		std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/validationresults";
+		std::string url = "https://" + _config->host() +  "/api/uasoperations/" + _operation_unique_identifier + "/validationresults";
 
 
 		std::string res;
@@ -220,7 +272,7 @@ int UniflyNode::get_action_items()
 		std::cerr << "Unique Identifier for operation not set" << std::endl;
 	}
 
-	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/actionItems";
+	std::string url = "https://" + _config->host() +  "/api/uasoperations/" + _operation_unique_identifier + "/actionItems";
 
 
 	std::string res;
@@ -253,7 +305,7 @@ int UniflyNode::get_permission(std::string uuid)
 	_comm.add_header("authorization", "Bearer " + _access_token);
 	_comm.add_header("content-type", "multipart/form-data");
 
-	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/permissions/" + uuid + "/request";
+	std::string url = "https://" + _config->host() +  "/api/uasoperations/" + _operation_unique_identifier + "/permissions/" + uuid + "/request";
 
 	time_t current_time;
 	time(&current_time);
@@ -292,7 +344,7 @@ int UniflyNode::get_traffic_channels()
 		return -1;
 	}
 
-	std::string url = "https://" UNIFLY_HOST "/api/realtime/position";
+	std::string url = "https://" + _config->host() +  "/api/realtime/position";
 
 
 	nlohmann::json position;
@@ -336,7 +388,7 @@ int UniflyNode::send_tracking_position()
 		return -1;
 	}
 
-	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/uases/" + _uas_uuid + "/track";
+	std::string url = "https://" + _config->host() +  "/api/uasoperations/" + _operation_unique_identifier + "/uases/" + _uas_uuid + "/track";
 	//std::cout << "URL: " << url << std::endl;
 
 	time_t current_time;
@@ -394,7 +446,7 @@ int UniflyNode::send_takeoff()
 	char now[21];
 	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
-	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/uases/" + _uas_uuid + "/takeoff";
+	std::string url = "https://" + _config->host() +  "/api/uasoperations/" + _operation_unique_identifier + "/uases/" + _uas_uuid + "/takeoff";
 
 	nlohmann::json takeoff;
 	takeoff["pilotLocation"]["latitude"] = _pilot_lat;
@@ -442,7 +494,7 @@ int UniflyNode::send_land()
 	char now[21];
 	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
-	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/uases/" + _uas_uuid + "/landing";
+	std::string url = "https://" + _config->host() +  "/api/uasoperations/" + _operation_unique_identifier + "/uases/" + _uas_uuid + "/landing";
 
 	nlohmann::json takeoff;
 	takeoff["pilotLocation"]["latitude"] = _pilot_lat;
@@ -478,7 +530,7 @@ int UniflyNode::send_cancel_permission()
 		std::cerr << "No permission to cancel" << std::endl;
 		return -1;
 	}
-	std::string url = "https://" UNIFLY_HOST "/api/uasoperations/" + _operation_unique_identifier + "/permissions/" + _permission_uuid + "/cancellation";
+	std::string url = "https://" + _config->host() +  "/api/uasoperations/" + _operation_unique_identifier + "/permissions/" + _permission_uuid + "/cancellation";
 
 	std::string postfields = "{}";
 
@@ -527,54 +579,4 @@ uint64_t UniflyNode::get_timestamp()
 	struct timeval tp;
 	gettimeofday(&tp, NULL);
 	return static_cast<std::uint64_t>(tp.tv_sec) * 1000L + tp.tv_usec / 1000;
-}
-
-void UniflyNode::position_update_callback(EventSource *es)
-{
-	//std::cout << "Got mavlink position" << std::endl;
-
-	UniflyNode *node = static_cast<UniflyNode*>(es->_target_object);
-	Subscription *sub = static_cast<Subscription*>(es);
-
-	std::string msg = sub->get_message();
-
-	// unpack msg
-	GPSMessage gps_msg;
-	gps_msg.ParseFromString(msg);
-
-	if (gps_msg.has_lat() && gps_msg.has_lon()) {
-		node->set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7, gps_msg.alt_msl() * 1e-3, gps_msg.alt_agl() * 1e-3);
-	}
-}
-
-void UniflyNode::command_callback(EventSource *es)
-{
-	ListenerReplier* rep = static_cast<ListenerReplier*>(es);
-	UniflyNode* node = static_cast<UniflyNode*>(es->_target_object);
-
-	std::string command = rep->get_message();
-
-	std::string reply = "NOTOK";
-	if (command == "land") {
-		reply = "LANDING";
-		node->send_land();
-
-	} else if (command == "takeoff") {
-		reply = "taking off";
-		node->send_takeoff();
-
-	} else if (command == "action_items") {
-		reply = "getting action items";
-		node->get_action_items();
-
-	} else if (command == "cancel") {
-		reply = "cancelling";
-		node->send_cancel_permission();
-
-	} else if (command == "get_traffic_channels") {
-		reply = "getting channels";
-		node->get_traffic_channels();
-	}
-
-	rep->send_response(reply);
 }

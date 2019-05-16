@@ -5,13 +5,20 @@
 #include "vutura_common/vutura_common.pb.h"
 #include "vutura_common/helper.hpp"
 #include "vutura_common/communicator.hpp"
-#include <vutura_common/subscription.hpp>
-#include <vutura_common/listener_replier.hpp>
+#include "nng_event_loop/event_loop.hpp"
+#include "nng_event_loop/timer.hpp"
+#include "nng_event_loop/subscriber.hpp"
+#include "nng_event_loop/replier.hpp"
 
-class UniflyNode {
+#include "unifly_config.hpp"
+
+class UniflyNode : public EventLoop {
 public:
-	UniflyNode(int instance);
-	int start();
+	UniflyNode(int instance, UniflyConfig *config);
+	int init();
+	void handle_gps_position(std::string message);
+	void handle_command(std::string request, std::string &reply);
+	int login();
 	int request_flight();
 	int get_user_id();
 	int get_validation_results();
@@ -26,23 +33,22 @@ public:
 	int periodic();
 	uint64_t get_timestamp();
 
-
-	Subscription gps_position_sub;//(&node, SOCK_PUBSUB_GPS_POSITION, handle_position_update);
-	ListenerReplier command_listener;
-
-	static void position_update_callback(EventSource* es);
-	static void command_callback(EventSource* es);
-
 private:
 
 	bool has_position_data() { return _has_position_data; }
 
+	int _instance;
+	UniflyConfig* _config;
 	Communicator _comm;
 	std::string _access_token;
 	std::string _operation_unique_identifier;
 	std::string _uas_uuid;
 	std::string _user_uuid;
 	std::string _permission_uuid;
+
+	Timer _periodic_timer;
+	Subscriber _gps_position_sub;
+	Replier _command_replier;
 
 	bool _has_position_data;
 	bool _takeoff;
