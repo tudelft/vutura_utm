@@ -1,18 +1,32 @@
 #include <unistd.h>
 #include <cmath>
 
-#include "vutura_common/event_loop.hpp"
-#include "vutura_common/timer.hpp"
+#include "vutura_common/config.hpp"
+#include "vutura_common/helper.hpp"
+//#include "vutura_common/event_loop.hpp"
+//#include "vutura_common/timer.hpp"
 
 #include "vutura_common.pb.h"
 
 #include "sim_node.hpp"
 
 SimNode::SimNode(int instance) :
-	gps_pub(socket_name(SOCK_PUBSUB_GPS_POSITION, instance)),
+	_periodic_timer(this),
+	_gps_pub(socket_name(SOCK_PUBSUB_GPS_POSITION, instance)),
 	_angle(0.0f)
 {
 
+}
+
+SimNode::~SimNode()
+{
+
+}
+
+void SimNode::init()
+{
+	_periodic_timer.set_timeout_callback(std::bind(&SimNode::handle_periodic_timer, this));
+	_periodic_timer.start_periodic(500);
 }
 
 int SimNode::handle_periodic_timer()
@@ -41,20 +55,11 @@ int SimNode::handle_periodic_timer()
 	gps_message.set_alt_msl(10000);
 	gps_message.set_alt_agl(10000);
 
-	gps_pub.publish(gps_message.SerializeAsString());
+	std::string message_string = gps_message.SerializeAsString();
+
+	_gps_pub.publish(message_string);
 
 	std::cout << "lat: " << lat << "\tlon: " << lon << std::endl;
 
 	return 0;
-}
-
-void SimNode::heartbeat_timer_callback(EventSource *es)
-{
-	Timer* tim = static_cast<Timer*>(es);
-	SimNode* node = static_cast<SimNode*>(es->_target_object);
-	uint64_t num_timer_events;
-	ssize_t recv_size = read(es->_fd, &num_timer_events, 8);
-	(void) recv_size;
-
-	node->handle_periodic_timer();
 }

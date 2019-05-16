@@ -1,22 +1,29 @@
-#pragma once
-#include "vutura_common/helper.hpp"
-#include "vutura_common/config.hpp"
-#include "vutura_common/udp_source.hpp"
-#include "vutura_common/publisher.hpp"
+#ifndef SIM_NODE_HPP
+#define SIM_NODE_HPP
 
-class SimNode {
+//#include "vutura_common/config.hpp"
+//#include "vutura_common/udp_source.hpp"
+//#include "vutura_common/publisher.hpp"
+#include "nng_event_loop/event_loop.hpp"
+#include "nng_event_loop/publisher.hpp"
+#include "nng_event_loop/timer.hpp"
+
+class SimNode : public EventLoop {
 public:
 	SimNode(int instance);
+	~SimNode();
 
+	void init();
 	int handle_periodic_timer();
 
-	static void heartbeat_timer_callback(EventSource *es);
-
 private:
-	Publisher gps_pub;
+	Timer _periodic_timer;
+	Publisher _gps_pub;
 
 	int _lat;
 	int _lon;
 	float _angle;
 
 };
+
+#endif // SIM_NODE_HPP

@@ -7,4 +7,4 @@ file(GLOB SRCS
 
 add_executable(${PROJECT_NAME} ${SRCS})
 
-target_link_libraries(${PROJECT_NAME} vutura_common)
+target_link_libraries(${PROJECT_NAME} nng_event_loop vutura_common)

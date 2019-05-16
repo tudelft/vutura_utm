@@ -1,24 +1,42 @@
-#include "vutura_common/event_loop.hpp"
-#include "vutura_common/timer.hpp"
-
-#include "vutura_common.pb.h"
+#include "vutura_common/cxxopts.hpp"
 
 #include "sim_node.hpp"
-
 
 int main(int argc, char **argv)
 {
 	int instance = 0;
-	if (argc > 1) {
-		instance = atoi(argv[1]);
+
+	// Parse options
+	try
+	{
+		cxxopts::Options options(argv[0], " - Airmap Simulation Node");
+		options
+				.positional_help("[optional args]")
+				.show_positional_help();
+
+		options
+				.add_options()
+				("i,instance", "Instance number, used for running multiple instances", cxxopts::value<int>(instance), "N")
+				("help", "Print help")
+				;
+
+		auto result = options.parse(argc, argv);
+
+		if (result.count("help"))
+		{
+			std::cout << options.help() << std::endl;
+			exit(0);
+		}
+
+	} catch (const cxxopts::OptionException& e)
+	{
+		std::cout << "error parsing options: " << e.what() << std::endl;
+		exit(1);
 	}
-	std::cout << "Instance " << std::to_string(instance) << std::endl;
+
+	std::cout << "Instance: " << std::to_string(instance) << std::endl;
 
 	SimNode node(instance);
-	EventLoop event_loop;
-
-	Timer heartbeat_timer(&node, 500, node.heartbeat_timer_callback);
-	event_loop.add(heartbeat_timer);
-
-	event_loop.start();
+	node.init();
+	node.run();
 }
