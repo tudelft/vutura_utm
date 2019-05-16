@@ -14,7 +14,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 add_subdirectory(nng_event_loop)
 add_subdirectory(vutura_common)
 
-#add_subdirectory(src/mavlink_node)
+add_subdirectory(src/mavlink_node)
 
 if (NOT ${PLATFORM} STREQUAL "Disco")
 	message("Compiling AIRMAP NODE")
