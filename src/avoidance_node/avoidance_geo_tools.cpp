@@ -29,3 +29,18 @@ void update_position_params(position_params& pos, double latd, double lond, doub
 
 	pos.r = sqrt((anan + bnbn) / (adad + bdbd));
 }
+
+void calc_position_from_reference(position_params& reference_pos, latdlond& target_latdlond, double pn, double pe)
+{
+	double ref_cos_lat = reference_pos.coslat;
+	double ref_r = reference_pos.r;
+
+	double diff_lat = asin(pn/ref_r);
+	double diff_lon = asin(pe/(ref_r * ref_cos_lat));
+
+	double diff_latd = diff_lat / M_PI * 180.;
+	double diff_lond = diff_lon / M_PI * 180.;
+
+	target_latdlond.latd = reference_pos.latd + diff_latd;
+	target_latdlond.lond = reference_pos.lond = diff_lond;
+}

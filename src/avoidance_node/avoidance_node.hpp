@@ -70,6 +70,8 @@ private:
 	double _vn_sp;
 	double _ve_sp;
 	double _vd_sp;
+	double _latd_sp;
+	double _lond_sp;
 
 	bool _logging;
 	std::ofstream _logfile;

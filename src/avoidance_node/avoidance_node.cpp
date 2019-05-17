@@ -31,6 +31,8 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_vn_sp(0),
 	_ve_sp(0),
 	_vd_sp(0),
+	_latd_sp(0),
+	_lond_sp(0),
 	_logging(false),
 	_intruders()
 {
@@ -141,6 +143,8 @@ int AvoidanceNode::handle_periodic_timer()
 	avoidance_velocity.set_vn(_vn_sp * 1000);
 	avoidance_velocity.set_ve(_ve_sp * 1000);
 	avoidance_velocity.set_vd(_vd_sp * 1000);
+	avoidance_velocity.set_lat(static_cast<int>(_latd_sp * 1e7));
+	avoidance_velocity.set_lon(static_cast<int>(_lond_sp * 1e7));
 	std::string request = avoidance_velocity.SerializeAsString();
 	//_avoidance_req.send_request(request);
 	_avoidance_pub.publish(request);
@@ -580,11 +584,34 @@ int AvoidanceNode::SSDResolution()
 		_vn_sp = Scale_from_clipper(vertices[1].w_n);
 		_avoid = true;
 
+		// Calculate CPA for solution
+		double max_t_cpa_res = 0;
+		for (std::pair<std::string, Avoidance_intruder*> intruder_pair : _intr_inconf)
+		{
+			Avoidance_intruder* intruder = intruder_pair.second;
+			double vn_res_rel = _vn_sp - intruder->getVn();
+			double ve_res_rel = _ve_sp - intruder->getVe();
+			double v_res_rel2 = pow(vn_res_rel,2) + pow(ve_res_rel,2);
+			double t_cpa_res = - (intruder->getPnRel() * vn_res_rel + intruder->getPeRel() * ve_res_rel) / (v_res_rel2);
+			double d_cpa_res = sqrt(intruder->getD2Rel() - pow(t_cpa_res, 2) * v_res_rel2);
+			max_t_cpa_res = std::max(max_t_cpa_res, t_cpa_res);
+		}
+		double cpa_n = _vn_sp * max_t_cpa_res; // [m]
+		double cpa_e = _ve_sp * max_t_cpa_res; // [m]
+
+		latdlond res_point;
+		calc_position_from_reference(_own_pos, res_point, cpa_n, cpa_e);
+		_latd_sp = res_point.latd;
+		_lond_sp = res_point.lond;
+
+		// Generate avoidance message
 		AvoidanceVelocity Avoidance_msg;
 		Avoidance_msg.set_vd(0);
 		Avoidance_msg.set_ve(static_cast<int>(_ve_sp * 1000.));
 		Avoidance_msg.set_vn(static_cast<int>(_vn_sp * 1000.));
 		Avoidance_msg.set_avoid(_avoid);
+		Avoidance_msg.set_lat(static_cast<int>(_latd_sp * 1e7));
+		Avoidance_msg.set_lon(static_cast<int>(_lond_sp * 1e7));
 		std::string avoidance_message = Avoidance_msg.SerializeAsString();
 		_avoidance_pub.publish(avoidance_message);
 	}
@@ -646,6 +673,8 @@ int AvoidanceNode::ResumeNav()
 		Avoidance_msg.set_ve(static_cast<int>(_ve_sp * 1000.));
 		Avoidance_msg.set_vn(static_cast<int>(_vn_sp * 1000.));
 		Avoidance_msg.set_avoid(_avoid);
+		Avoidance_msg.set_lat(static_cast<int>(_latd_sp * 1e7));
+		Avoidance_msg.set_lon(static_cast<int>(_lond_sp * 1e7));
 		std::string avoidance_message = Avoidance_msg.SerializeAsString();
 		_avoidance_pub.publish(avoidance_message);
 		std::cout << "Resuming Nav" << std::endl;

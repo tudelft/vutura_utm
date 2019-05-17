@@ -28,6 +28,8 @@ message AvoidanceVelocity {
   required sint32 vn = 2; // [m/sE3]
   required sint32 ve = 3; // [m/sE3]
   required sint32 vd = 4; // [m/sE3]
+  required sint32 lat = 5; // [degE7]
+  required sint32 lon = 6; // [degE7]
 }
 
 message UavHeartbeat {
