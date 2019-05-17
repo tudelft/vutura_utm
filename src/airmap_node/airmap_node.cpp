@@ -85,6 +85,11 @@ void AirmapNode::handle_utm_sp(std::string request, std::string &reply)
 	} else if (request == "get_brief") {
 		get_brief();
 
+	} else {
+		std::cout << "Received wrong command: " << request << std::endl;
+		reply = "NOTOK";
+		return;
+
 	}
 
 	reply = "OK";

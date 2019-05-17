@@ -1,8 +1,14 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/aed.png" width="200">
-    <button v-promise-btn="{ promise: dataPromise }" @click="getData('param')">Request AED</button>
-    <button v-promise-btn @click="startFlight">Start Flight</button>
+    <div class="row">
+      <img alt="Vue logo" src="./assets/aed.png" width="200"><br><br>
+    </div>
+    <div class="column">
+      <button id="requestFlightButton" v-promise-btn="{ promise: requestFlightPromise }" @click="requestFlight">Request Flight</button>
+      <button id="startFlightButton" v-promise-btn="{ promise: startFlightPromise }" @click="startFlight">Start Flight</button>
+      <button id="endFlightButton" v-promise-btn="{ promise: endFlightPromise }" @click="endFlight">End Flight</button>
+      <br><br>
+    </div>
     <div class="column" align="center">
       <drag-verify :width="killSlider.width"
          :height="killSlider.height" 
@@ -44,7 +50,11 @@ export default {
         progressBarBg: "#ff0000",
         completedBg: "#ff0000",
       },
-      dataPromise: null
+      requestFlightPromise: null,
+      startFlightPromise: null,
+      endFlightPromise: null,
+      promiseResolve: null,
+      promiseReject: null,
     }
   },
   methods: {
@@ -52,19 +62,64 @@ export default {
       console.log("KILL SIGNAL");
     },
     dummyAsyncAction () {
-      console.log("async");
-      return new Promise((resolve, reject) => setTimeout(resolve, 2000))
+      return new Promise(function(resolve, reject) {
+        this.promiseResolve = resolve;
+        this.promiseReject = reject;
+      }.bind(this));
     },
     isLoading() {
       console.log("isLoading");
     },
-    getData() {
-      console.log("getData");
-      this.dataPromise = this.dummyAsyncAction();
-      console.log("door");
+    requestFlight() {
+      this.updateUi("init");
+      console.log("request_flight");
+      this.$socket.emit("request_flight");
+      this.requestFlightPromise = this.dummyAsyncAction();
     },
     startFlight() {
+      this.updateUi("init");
+      this.$socket.emit("start_flight");
       console.log("Start flight");
+      this.startFlightPromise = this.dummyAsyncAction();
+    },
+    endFlight() {
+      this.updateUi("init");
+      this.$socket.emit("end_flight");
+      console.log("End flight");
+      this.endFlightPromise = this.dummyAsyncAction();
+    },
+    updateUi(state) {
+      if (state == "init") {
+        requestFlightButton.disabled = true;
+        startFlightButton.disabled = true;
+        endFlightButton.disabled = true;
+      } else if (state == "logged in") {
+        requestFlightButton.disabled = true;
+        startFlightButton.disabled = true;
+        endFlightButton.disabled = true;
+      } else if (state == "flight requested") {
+        requestFlightButton.disabled = true;
+        startFlightButton.disabled = true;
+        endFlightButton.disabled = true;
+      } else if (state == "flight authorized") {
+        requestFlightButton.disabled = true;
+        startFlightButton.disabled = true;
+        endFlightButton.disabled = true;
+      } else if (state == "flight started") {
+        requestFlightButton.disabled = true;
+        startFlightButton.disabled = true;
+        endFlightButton.disabled = true;
+      }
+    }
+  },
+  sockets: {
+    utmsp_response: function(data) {
+      console.log("response", data.toString());
+      this.promiseResolve();
+      this.updateUi("init");
+      if(data.toString() == "NOTOK") {
+        console.log("OKE");
+      }
     }
   }
 }
