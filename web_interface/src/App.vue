@@ -54,7 +54,6 @@ export default {
   name: "app",
   components: {
     dragVerify,
-    VuePromiseBtn
   },
   data() {
     return {
