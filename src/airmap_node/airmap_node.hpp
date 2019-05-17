@@ -13,6 +13,8 @@
 #include "nng_event_loop/subscriber.hpp"
 #include "nng_event_loop/publisher.hpp"
 
+#include "airmap_traffic.hpp"
+
 class AirmapNode : public EventLoop {
 public:
 	enum AirmapState {
@@ -45,10 +47,10 @@ public:
 
 private:
 
+	bool has_position_data() { return _has_position_data; }
+
 	int _instance;
 	AirmapState _state;
-
-	bool has_position_data() { return _has_position_data; }
 
 	AirmapCommunicator _communicator;
 	UdpSender _udp;

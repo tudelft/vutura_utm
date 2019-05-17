@@ -17,7 +17,6 @@
 #include "vutura_common/helper.hpp"
 #include "vutura_common/config.hpp"
 #include "vutura_common.pb.h"
-#include "airmap_traffic.hpp"
 
 #include "airmap_node.hpp"
 
@@ -267,11 +266,14 @@ int AirmapNode::start_flight() {
 
 	if (_traffic.start(_flightID, _communicator.get_token()) == -1) {
 		std::cerr << "MQTT traffic could not start" << std::endl;
+		_communicator.end(_flightID);
 		return -1;
 	}
 
 	if (-1 == _udp.connect()) {
 		std::cout << "Failed to connect!" << std::endl;
+		_communicator.end(_flightID);
+		_traffic.stop();
 		return -1;
 	}
 
@@ -285,7 +287,6 @@ int AirmapNode::end_flight() {
 	}
 	// end communication and flight
 	_traffic.stop();
-//	_communicator.query_telemetry(_flightID);
 	_communicator.end(_flightID);
 	_communicator.end_flight(_flightID);
 	_commsKey = "";
