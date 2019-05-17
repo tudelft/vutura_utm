@@ -16,8 +16,8 @@ add_subdirectory(vutura_common)
 
 add_subdirectory(src/mavlink_node)
 
-if ((NOT DEFINED ${PLATFORM}) OR (NOT ${PLATFORM} STREQUAL "Disco"))
-	message("Compiling AIRMAP NODE")
+if ((NOT DEFINED PLATFORM) OR (NOT ${PLATFORM} STREQUAL "Disco"))
+	message("Compiling AIRMAP NODE ${PLATFORM}")
 	add_subdirectory(src/airmap_node)
 else()
 	message("PLATFORM ${PLATFORM}")
