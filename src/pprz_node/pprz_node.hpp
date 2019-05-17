@@ -2,8 +2,11 @@
 
 #include "vutura_common/helper.hpp"
 #include "vutura_common/config.hpp"
-#include "vutura_common/udp_source.hpp"
-#include "vutura_common/publisher.hpp"
+#include "nng_event_loop/event_loop.hpp"
+#include "nng_event_loop/udp_source.hpp"
+#include "nng_event_loop/publisher.hpp"
+#include "nng_event_loop/subscriber.hpp"
+
 #include "vutura_common.pb.h"
 
 union paparazzi_to_vutura_msg_t {
@@ -26,25 +29,30 @@ union vutura_to_paparazzi_msg_t {
                 int32_t ve;
                 int32_t vd;
         };
-        unsigned char bytes;
+	unsigned char bytes;
 } __attribute((__packed__));
 typedef union vutura_to_paparazzi_msg_t VuturaToPaparazziMsg;
 
-class PaparazziNode {
+class PaparazziNode : public EventLoop {
 public:
 	PaparazziNode(int instance);
 	~PaparazziNode();
 
-        static void pprz_callback(EventSource* es);
-        static void avoidance_command_callback(EventSource* es);
+	void init();
+	void pprz_callback(std::string packet);
+	void avoidance_command_callback(std::string message);
 
-        UdpSource pprz_comm;
-	Publisher position_publisher;
 
 private:
 	int _instance;
 
+	UdpSource _pprz_comm;
+	Subscriber _avoidance_sub;
+	Publisher _position_publisher;
+
 	PaparazziToVuturaMsg _gpos_msg;
+
+	uint8_t _buffer[BUFFER_LENGTH];
 
         int handle_avoidance(AvoidanceVelocity avoidance_velocity);
 };
