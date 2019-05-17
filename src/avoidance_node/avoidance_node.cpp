@@ -4,16 +4,18 @@
 #include <algorithm>
 #include "sys/time.h"
 
-#include "vutura_common/event_loop.hpp"
-#include "vutura_common/timer.hpp"
-#include "vutura_common/subscription.hpp"
-
 #include "vutura_common.pb.h"
 
 #include "avoidance_node.hpp"
 
+using namespace std::placeholders;
+
 AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_geometry& geometry) :
         //_avoidance_req(this, socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance), avoidance_reply_callback),
+	_instance(instance),
+	_periodic_timer(this),
+	_traffic_sub(this),
+	_gps_sub(this),
         _avoidance_pub(socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance)),
 	_avoidance_config(config),
 	_avoidance_geometry(geometry),
@@ -33,6 +35,21 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
         _intruders()
 {
 
+}
+
+void AvoidanceNode::init()
+{
+	InitialiseSSD();
+	InitialiseLogger();
+
+	_periodic_timer.set_timeout_callback(std::bind(&AvoidanceNode::handle_periodic_timer, this));
+	_periodic_timer.start_periodic(200);
+
+	_traffic_sub.set_receive_callback(std::bind(&AvoidanceNode::traffic_callback, this, _1));
+	_traffic_sub.subscribe(socket_name(SOCK_PUBSUB_TRAFFIC_INFO, _instance));
+
+	_gps_sub.set_receive_callback(std::bind(&AvoidanceNode::gps_position_callback, this, _1));
+	_gps_sub.subscribe(socket_name(SOCK_PUBSUB_GPS_POSITION, _instance));
 }
 
 int AvoidanceNode::InitialiseSSD()
@@ -155,6 +172,16 @@ int AvoidanceNode::handle_periodic_timer()
 	return 0;
 }
 
+void AvoidanceNode::traffic_callback(std::string message)
+{
+	TrafficInfo traffic_info;
+	bool success = traffic_info.ParseFromString(message);
+	if (success) {
+		handle_traffic(traffic_info);
+	}
+
+}
+
 int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
 {       
         std::string aircraft_id_i = traffic.aircraft_id();
@@ -199,7 +226,16 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
         if (!_gps_position_valid) {
                 std::cerr << "Unknown position of self" << std::endl;
                 return -1;
-        }
+	}
+}
+
+void AvoidanceNode::gps_position_callback(std::string message)
+{
+	GPSMessage gps_info;
+	bool success = gps_info.ParseFromString(message);
+	if (success) {
+		handle_gps_position(gps_info);
+	}
 }
 
 int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
@@ -260,53 +296,16 @@ double AvoidanceNode::getTimeStamp()
         return tp.tv_sec + tp.tv_usec * 1e-6;
 }
 
-void AvoidanceNode::periodic_timer_callback(EventSource *es)
-{
-	Timer* tim = static_cast<Timer*>(es);
-	AvoidanceNode* node = static_cast<AvoidanceNode*>(es->_target_object);
-	uint64_t num_timer_events;
-	ssize_t recv_size = read(es->_fd, &num_timer_events, 8);
-	(void) recv_size;
+//void AvoidanceNode::avoidance_reply_callback(EventSource *es)
+//{
+//	Requester* req = static_cast<Requester*>(es);
+//	AvoidanceNode* node = static_cast<AvoidanceNode*>(es->_target_object);
 
-	node->handle_periodic_timer();
-}
-
-void AvoidanceNode::traffic_callback(EventSource *es)
-{
-	Subscription* traffic_sub = static_cast<Subscription*>(es);
-	AvoidanceNode* node = static_cast<AvoidanceNode*>(es->_target_object);
-
-	std::string message = traffic_sub->get_message();
-	TrafficInfo traffic_info;
-	bool success = traffic_info.ParseFromString(message);
-	if (success) {
-		node->handle_traffic(traffic_info);
-	}
-}
-
-void AvoidanceNode::gps_position_callback(EventSource *es)
-{
-	Subscription* gps_sub = static_cast<Subscription*>(es);
-	AvoidanceNode* node = static_cast<AvoidanceNode*>(es->_target_object);
-
-	std::string message = gps_sub->get_message();
-	GPSMessage gps_info;
-	bool success = gps_info.ParseFromString(message);
-	if (success) {
-		node->handle_gps_position(gps_info);
-	}
-}
-
-void AvoidanceNode::avoidance_reply_callback(EventSource *es)
-{
-	Requester* req = static_cast<Requester*>(es);
-	AvoidanceNode* node = static_cast<AvoidanceNode*>(es->_target_object);
-
-	std::string reply = req->get_reply();
-	if (reply != "OK") {
-		std::cout << reply << std::endl;
-	}
-}
+//	std::string reply = req->get_reply();
+//	if (reply != "OK") {
+//		std::cout << reply << std::endl;
+//	}
+//}
 
 void AvoidanceNode::write_log()
 {
@@ -586,7 +585,8 @@ int AvoidanceNode::SSDResolution()
                 Avoidance_msg.set_ve(static_cast<int>(_ve_sp * 1000.));
                 Avoidance_msg.set_vn(static_cast<int>(_vn_sp * 1000.));
                 Avoidance_msg.set_avoid(_avoid);
-                _avoidance_pub.publish(Avoidance_msg.SerializeAsString());
+		std::string avoidance_message = Avoidance_msg.SerializeAsString();
+		_avoidance_pub.publish(avoidance_message);
         }
         return 0;
 }
@@ -646,7 +646,8 @@ int AvoidanceNode::ResumeNav()
                 Avoidance_msg.set_ve(static_cast<int>(_ve_sp * 1000.));
                 Avoidance_msg.set_vn(static_cast<int>(_vn_sp * 1000.));
                 Avoidance_msg.set_avoid(_avoid);
-                _avoidance_pub.publish(Avoidance_msg.SerializeAsString());
+		std::string avoidance_message = Avoidance_msg.SerializeAsString();
+		_avoidance_pub.publish(avoidance_message);
                 std::cout << "Resuming Nav" << std::endl;
         }
 

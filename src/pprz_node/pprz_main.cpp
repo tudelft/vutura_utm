@@ -42,9 +42,4 @@ int main(int argc, char* argv[])
 
 	node.init();
 	node.run();
-
-//        Subscription avoidance_sub(&node, socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, instance), node.avoidance_command_callback);
-//        loop.add(avoidance_sub);
-
-//	loop.start();
 }
