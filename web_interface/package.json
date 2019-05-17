@@ -10,7 +10,8 @@
   "dependencies": {
     "core-js": "^2.6.5",
     "vue": "^2.6.10",
-    "vue-drag-verify": "^1.0.6"
+    "vue-drag-verify": "^1.0.6",
+    "vue-promise-btn": "^2.0.2"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.7.0",
