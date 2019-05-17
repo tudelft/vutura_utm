@@ -1,40 +1,57 @@
 <template>
   <div id="app">
     <div class="row">
-      <img alt="Vue logo" src="./assets/aed.png" width="200"><br><br>
+      <img alt="Vue logo" src="./assets/aed.png" width="200">
+      <br>
+      <br>
     </div>
     <div class="column">
-      <button id="requestFlightButton" v-promise-btn="{ promise: requestFlightPromise }" @click="requestFlight">Request Flight</button>
-      <button id="startFlightButton" v-promise-btn="{ promise: startFlightPromise }" @click="startFlight">Start Flight</button>
-      <button id="endFlightButton" v-promise-btn="{ promise: endFlightPromise }" @click="endFlight">End Flight</button>
-      <br><br>
+      <button
+        id="requestFlightButton"
+        v-promise-btn="{ promise: requestFlightPromise }"
+        @click="requestFlight"
+      >Request Flight</button>
+      <button
+        id="startFlightButton"
+        v-promise-btn="{ promise: startFlightPromise }"
+        @click="startFlight"
+      >Start Flight</button>
+      <button
+        id="endFlightButton"
+        v-promise-btn="{ promise: endFlightPromise }"
+        @click="endFlight"
+      >End Flight</button>
+      <br>
+      <br>
     </div>
     <div class="column" align="center">
-      <drag-verify :width="killSlider.width"
-         :height="killSlider.height" 
-         :text="killSlider.text"
-         :success-text="killSlider.successText" 
-         :background="killSlider.background" 
-         :progress-bar-bg="killSlider.progressBarBg" 
-         :completed-bg="killSlider.completedBg" 
-         :handler-bg="killSlider.handlerBg" 
-         :handler-icon="killSlider.handlerIcon" 
-         :text-size="killSlider.textSize" 
-         :success-icon="killSlider.successIcon" 
-         v-on:passcallback="killHandler"></drag-verify>
+      <drag-verify
+        :width="killSlider.width"
+        :height="killSlider.height"
+        :text="killSlider.text"
+        :success-text="killSlider.successText"
+        :background="killSlider.background"
+        :progress-bar-bg="killSlider.progressBarBg"
+        :completed-bg="killSlider.completedBg"
+        :handler-bg="killSlider.handlerBg"
+        :handler-icon="killSlider.handlerIcon"
+        :text-size="killSlider.textSize"
+        :success-icon="killSlider.successIcon"
+        v-on:passcallback="killHandler"
+      ></drag-verify>
     </div>
   </div>
 </template>
 
 <script>
-import Vue from 'vue'
-import dragVerify from 'vue-drag-verify'
-import VuePromiseBtn from 'vue-promise-btn'
-import 'vue-promise-btn/dist/vue-promise-btn.css'
+import Vue from "vue";
+import dragVerify from "vue-drag-verify";
+import VuePromiseBtn from "vue-promise-btn";
+import "vue-promise-btn/dist/vue-promise-btn.css";
 
-Vue.use(VuePromiseBtn)
+Vue.use(VuePromiseBtn);
 export default {
-  name: 'app',
+  name: "app",
   components: {
     dragVerify,
     VuePromiseBtn
@@ -48,24 +65,26 @@ export default {
         successText: "KILL SIGNAL SENT",
         textSize: "40px",
         progressBarBg: "#ff0000",
-        completedBg: "#ff0000",
+        completedBg: "#ff0000"
       },
       requestFlightPromise: null,
       startFlightPromise: null,
       endFlightPromise: null,
       promiseResolve: null,
-      promiseReject: null,
-    }
+      promiseReject: null
+    };
   },
   methods: {
     killHandler() {
       console.log("KILL SIGNAL");
     },
-    dummyAsyncAction () {
-      return new Promise(function(resolve, reject) {
-        this.promiseResolve = resolve;
-        this.promiseReject = reject;
-      }.bind(this));
+    dummyAsyncAction() {
+      return new Promise(
+        function(resolve, reject) {
+          this.promiseResolve = resolve;
+          this.promiseReject = reject;
+        }.bind(this)
+      );
     },
     isLoading() {
       console.log("isLoading");
@@ -94,7 +113,7 @@ export default {
         startFlightButton.disabled = true;
         endFlightButton.disabled = true;
       } else if (state == "logged in") {
-        requestFlightButton.disabled = true;
+        requestFlightButton.disabled = false;
         startFlightButton.disabled = true;
         endFlightButton.disabled = true;
       } else if (state == "flight requested") {
@@ -103,12 +122,14 @@ export default {
         endFlightButton.disabled = true;
       } else if (state == "flight authorized") {
         requestFlightButton.disabled = true;
-        startFlightButton.disabled = true;
+        startFlightButton.disabled = false;
         endFlightButton.disabled = true;
       } else if (state == "flight started") {
         requestFlightButton.disabled = true;
         startFlightButton.disabled = true;
-        endFlightButton.disabled = true;
+        endFlightButton.disabled = false;
+      } else {
+        console.log("Halllo");
       }
     }
   },
@@ -116,18 +137,19 @@ export default {
     utmsp_response: function(data) {
       console.log("response", data.toString());
       this.promiseResolve();
-      this.updateUi("init");
-      if(data.toString() == "NOTOK") {
-        console.log("OKE");
-      }
+      this.updateUi(data.toString());
+    },
+    state_update: function(data) {
+      console.log("state update", data.toString());
+      this.updateUi(data.toString());
     }
   }
-}
+};
 </script>
 
 <style>
 #app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  font-family: "Avenir", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
@@ -149,7 +171,8 @@ input[type="submit"] {
   text-decoration: none;
   text-align: center;
   cursor: pointer;
-  -webkit-transition: background-color 0.1s linear, color 0.1s linear, width 0.2s ease;
+  -webkit-transition: background-color 0.1s linear, color 0.1s linear,
+    width 0.2s ease;
   transition: background-color 0.1s linear, color 0.1s linear, width 0.2s ease;
 }
 
@@ -173,5 +196,4 @@ button.hide-loader .hidden {
   display: flex;
   justify-content: space-between;
 }
-
 </style>

@@ -92,7 +92,7 @@ void AirmapNode::handle_utm_sp(std::string request, std::string &reply)
 
 	}
 
-	reply = "OK";
+	reply = state_name(_state);
 }
 
 void AirmapNode::handle_position_update(std::string message)
@@ -119,35 +119,7 @@ void AirmapNode::handle_uav_hb(std::string message)
 void AirmapNode::update_state(AirmapNode::AirmapState new_state) {
 	_state = new_state;
 
-	std::string state = "";
-	switch (new_state) {
-	case STATE_INIT:
-		state = "init";
-		break;
-
-	case STATE_LOGGED_IN:
-		state = "logged in";
-		break;
-
-	case STATE_FLIGHT_REQUESTED:
-		state = "flight requested";
-		break;
-
-	case STATE_FLIGHT_AUTHORIZED:
-		state = "flight authorized";
-		break;
-
-	case STATE_FLIGHT_STARTED:
-		// serial number
-		_comms_counter = 1;
-		state = "flight started";
-		break;
-
-	default:
-		state = "unknown state";
-		break;
-	}
-
+	std::string state = state_name(_state);
 	_pub_utm_status_update.publish(state);
 }
 
@@ -207,6 +179,9 @@ int AirmapNode::request_flight() {
 }
 
 int AirmapNode::periodic() {
+	std::string state = state_name(_state);
+	_pub_utm_status_update.publish(state);
+
 	if (_state == STATE_FLIGHT_REQUESTED) {
 		get_brief();
 
@@ -240,6 +215,40 @@ int AirmapNode::set_armed(bool armed)
 int AirmapNode::set_geometry(nlohmann::json geometry)
 {
 	_geometry = geometry;
+}
+
+std::string AirmapNode::state_name(AirmapNode::AirmapState state)
+{
+	std::string state_name = "";
+	switch (state) {
+	case STATE_INIT:
+		state_name = "init";
+		break;
+
+	case STATE_LOGGED_IN:
+		state_name = "logged in";
+		break;
+
+	case STATE_FLIGHT_REQUESTED:
+		state_name = "flight requested";
+		break;
+
+	case STATE_FLIGHT_AUTHORIZED:
+		state_name = "flight authorized";
+		break;
+
+	case STATE_FLIGHT_STARTED:
+		// serial number
+		_comms_counter = 1;
+		state_name = "flight started";
+		break;
+
+	default:
+		state_name = "unknown state";
+		break;
+	}
+
+	return state_name;
 }
 
 int AirmapNode::get_brief() {

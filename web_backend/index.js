@@ -4,9 +4,17 @@ var nano = require('nanomsg');
 var utm_sp_req = nano.socket('req');
 utm_sp_req.connect('ipc:///tmp/utmsp_0');
 
+var utm_status_sub = nano.socket('sub');
+utm_status_sub.connect("ipc:///tmp/utm_status_update_0")
+
 utm_sp_req.on('data', function (buf) {
 	console.log('received response: ', buf.toString());
 	io.emit('utmsp_response', buf.toString());
+});
+
+utm_status_sub.on('data', function (buf) {
+	console.log('received state update: ', buf.toString());
+	io.emit('state_update', buf.toString());
 });
 
 io.on('connection', function(client) {
@@ -18,7 +26,15 @@ io.on('connection', function(client) {
 
 	client.on('request_flight', () => {
 		console.log("Request flight");
-		utm_sp_req.send('test command');		
+		utm_sp_req.send('request_flight');		
+	});
+	
+	client.on('start_flight', () => {
+		utm_sp_req.send('start_flight');
+	});
+
+	client.on('end_flight', () => {
+		utm_sp_req.send('end_flight');
 	});
 });
 

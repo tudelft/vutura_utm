@@ -48,6 +48,7 @@ public:
 private:
 
 	bool has_position_data() { return _has_position_data; }
+	std::string state_name(AirmapState state);
 
 	int _instance;
 	AirmapState _state;
