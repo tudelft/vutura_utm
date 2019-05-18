@@ -26,6 +26,7 @@ AirmapNode::AirmapNode(int instance) :
 	_instance(instance),
 	_autostart_flight(false),
 	_state(STATE_INIT),
+	_armed(false),
 	_communicator(airmap::api_key),
 	_udp(AIRMAP_TELEM_HOST, AIRMAP_TELEM_PORT),
 	_periodic_timer(this),
@@ -76,6 +77,11 @@ void AirmapNode::handle_utm_sp(std::string request, std::string &reply)
 		_autostart_flight = true;
 		request_flight();
 
+	} else if (request == "abort_autoflight") {
+		_autostart_flight = false;
+		std::string command = "abort";
+		_pub_uav_command.publish(command);
+
 	} else if (request == "start_flight") {
 		start_flight();
 
@@ -118,6 +124,12 @@ void AirmapNode::handle_uav_hb(std::string message)
 	hb.ParseFromString(message);
 
 	set_armed(hb.armed());
+
+	if(hb.has_aborted()) {
+		if (hb.aborted()) {
+			abort();
+		}
+	}
 }
 
 void AirmapNode::update_state(AirmapNode::AirmapState new_state) {
@@ -182,7 +194,7 @@ int AirmapNode::request_flight() {
 	}
 }
 
-int AirmapNode::periodic() {
+void AirmapNode::periodic() {
 	std::string state = state_name(_state);
 	_pub_utm_status_update.publish(state);
 
@@ -202,23 +214,72 @@ uint64_t AirmapNode::getTimeStamp() {
 	return static_cast<std::uint64_t>(tp.tv_sec) * 1000L + tp.tv_usec / 1000;
 }
 
-int AirmapNode::set_armed(bool armed)
+int AirmapNode::set_armed(bool new_armed_state)
 {
 	std::string hb = "HB";
 	_pub_uav_command.publish(hb);
-	if (!armed) {
-		// disarm event
-		std::cout << "Disarm event" << std::endl;
-		if (_state == STATE_FLIGHT_STARTED) {
-			std::cout << "Automatically ending flight" << std::endl;
-			//end_flight();
-		}
+
+	if (_state == STATE_FLIGHT_STARTED && new_armed_state) {
+		update_state(STATE_ARMED);
 	}
+
+	if (_state == STATE_ARMED && new_armed_state == false) {
+		update_state(STATE_FLIGHT_STARTED);
+	}
+
+	if (new_armed_state != _armed) {
+
+		if (new_armed_state == true) {
+			// arm event
+
+		} else {
+			// disarm event
+			std::cout << "Disarm event" << std::endl;
+			if (_state >= STATE_FLIGHT_STARTED) {
+				std::cout << "Automatically ending flight" << std::endl;
+				end_flight();
+			}
+		}
+
+	}
+
+	_armed = new_armed_state;
 }
 
 int AirmapNode::set_geometry(nlohmann::json geometry)
 {
 	_geometry = geometry;
+}
+
+void AirmapNode::abort()
+{
+	// we noticed that the requested flight was successfully aborted
+	// depending on the state, take action
+	switch (_state) {
+	case STATE_INIT:
+	case STATE_LOGGED_IN:
+		// no action required
+		break;
+
+		break;
+	case STATE_FLIGHT_REQUESTED:
+	case STATE_FLIGHT_AUTHORIZED:
+		_communicator.end_all_active_flights(_pilotID);
+		update_state(STATE_LOGGED_IN);
+		break;
+
+	case STATE_FLIGHT_STARTED:
+		end_flight();
+		break;
+
+	case STATE_ARMED:
+		// don't do anything yet, will end flight when disarmed and in flight started state
+		break;
+
+	}
+
+	std::string reply = "abort confirmed";
+	_pub_uav_command.publish(reply);
 }
 
 std::string AirmapNode::state_name(AirmapNode::AirmapState state)
@@ -245,6 +306,10 @@ std::string AirmapNode::state_name(AirmapNode::AirmapState state)
 		// serial number
 		_comms_counter = 1;
 		state_name = "flight started";
+		break;
+
+	case STATE_ARMED:
+		state_name = "armed";
 		break;
 
 	default:

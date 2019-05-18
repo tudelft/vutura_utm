@@ -34,6 +34,7 @@ message AvoidanceVelocity {
 
 message UavHeartbeat {
   optional bool armed = 1;
+  optional bool aborted = 2;
 }
 
 enum MavCommands {

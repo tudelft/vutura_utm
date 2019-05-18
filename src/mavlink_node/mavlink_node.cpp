@@ -16,6 +16,8 @@ MavlinkNode::MavlinkNode(int instance) :
 	_armed(false),
 	_guided_mode(false),
 	_avoiding(false),
+	_arming_delay(-1),
+	_aborted(false),
 	_heartbeat_timer(this),
 	_mavlink_comm(this),
 	_uav_command_sub(this),
@@ -34,8 +36,8 @@ MavlinkNode::~MavlinkNode()
 
 void MavlinkNode::init()
 {
-	_heartbeat_timer.set_timeout_callback(std::bind(&MavlinkNode::emit_heartbeat, this));
-	_heartbeat_timer.start_periodic(1000);
+	_heartbeat_timer.set_timeout_callback(std::bind(&MavlinkNode::periodic, this));
+	_heartbeat_timer.start_periodic(1000); // be careful with changing this timer, is is also used for arming delay
 
 	_mavlink_comm.set_receive_callback(std::bind(&MavlinkNode::handle_udp_packet, this, _1));
 	_mavlink_comm.connect(MAVLINK_IP, MAVLINK_PORT, 14551);
@@ -50,18 +52,46 @@ void MavlinkNode::init()
 void MavlinkNode::uav_command(std::string command)
 {
 	if (command == "start mission") {
-		std::cout << "Should start mission now." << std::endl;
-		mavlink_message_t msg;
-		mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_MISSION_START, 0, 0, 0, 0, 0, 0, 0, 0);
-		uint16_t len = mavlink_msg_to_send_buffer(_buffer, &msg);
-		std::string packet((char*)_buffer, len);
-		_mavlink_comm.send_packet(packet);
+		std::cout << "Start timeout for mission." << std::endl;
+		_arming_delay = 0;
+		_aborted = false;
+
+	} else if (command == "abort") {
+		std::cout << "Stop mission countdown sequence" << std::endl;
+		if (_arming_delay >= 0) {
+			std::cout << "ABORT BEEP" << std::endl;
+		} else {
+			std::cout << "TOO LATE" << std::endl;
+		}
+		_arming_delay = -1;
+		_aborted = true;
+
+	} else if (command == "abort confirmed") {
+		std::cout << "abort confirmed" << std::endl;
+		_aborted = false;
 
 	} else if (command == "HB") {
 		// do nothing
 
 	} else {
 		std::cout << "Received: " << command << std::endl;
+	}
+}
+
+void MavlinkNode::periodic()
+{
+	emit_heartbeat();
+
+	// pre-arming timer
+	if (_arming_delay >= 0) {
+		_arming_delay++;
+		// make sound
+		std::cout << "Play beep " << std::to_string(_arming_delay) << std::endl;
+	}
+
+	if (_arming_delay == 20) {
+		start_mission();
+		_arming_delay = -1;
 	}
 }
 
@@ -106,7 +136,7 @@ void MavlinkNode::handle_mavlink_message(mavlink_message_t *msg)
 		}
 		skip_counter = 0;
 
-		printf("[mavlink_node] got global position lat: %f lon: %f alt_msl: %f alt_agl: %f\n", global_pos.lat * 1e-7, global_pos.lon * 1e-7, global_pos.alt * 1e-3, global_pos.relative_alt * 1e-3);
+		//printf("[mavlink_node] got global position lat: %f lon: %f alt_msl: %f alt_agl: %f\n", global_pos.lat * 1e-7, global_pos.lon * 1e-7, global_pos.alt * 1e-3, global_pos.relative_alt * 1e-3);
 		GPSMessage gps_message;
 		uint16_t len;
 		gps_message.set_timestamp(0);
@@ -130,7 +160,7 @@ void MavlinkNode::handle_mavlink_message(mavlink_message_t *msg)
 		gps_json_string += "\"height\": " + std::to_string(global_pos.relative_alt) + "}";
 
 		_gps_json_pub.publish(gps_json_string);
-		std::cout << gps_json_string << std::endl;
+//		std::cout << gps_json_string << std::endl;
 
 	} else if (msg->msgid == MAVLINK_MSG_ID_HEARTBEAT) {
 		// std::cout << "HB received" << std::endl;
@@ -211,16 +241,17 @@ void MavlinkNode::avoidance_velocity_vector(bool avoid, float vn, float ve, floa
 
 void MavlinkNode::set_armed_state(bool armed)
 {
-	if (armed != _armed) {
-		// update state and publish
-		_armed = armed;
 
-		UavHeartbeat uavhb;
-		uavhb.set_armed(_armed);
-		std::string message_string = uavhb.SerializeAsString();
-		_uav_armed_pub.publish(message_string);
+	// update state and publish
+	_armed = armed;
 
-	}
+	UavHeartbeat uavhb;
+	uavhb.set_armed(_armed);
+	uavhb.set_aborted(_aborted);
+	std::string message_string = uavhb.SerializeAsString();
+	_uav_armed_pub.publish(message_string);
+
+
 }
 
 void MavlinkNode::set_guided_state(bool guided_mode_enabled)
@@ -255,4 +286,15 @@ void MavlinkNode::enable_offboard(bool offboard)
 
 	std::string packet((char*)_buffer, len);
 	_mavlink_comm.send_packet(packet);
+}
+
+void MavlinkNode::start_mission()
+{
+	std::cout << "Start mission command!" << std::endl;
+	mavlink_message_t msg;
+	mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_MISSION_START, 0, 0, 0, 0, 0, 0, 0, 0);
+	uint16_t len = mavlink_msg_to_send_buffer(_buffer, &msg);
+	std::string packet((char*)_buffer, len);
+	_mavlink_comm.send_packet(packet);
+
 }

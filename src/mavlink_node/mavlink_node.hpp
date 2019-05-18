@@ -19,6 +19,7 @@ public:
 
 	void init();
 	void uav_command(std::string command);
+	void periodic();
 	void emit_heartbeat();
 	void handle_udp_packet(std::string packet);
 	void handle_mavlink_message(mavlink_message_t *msg);
@@ -30,10 +31,14 @@ public:
 	void enable_offboard(bool offboard);
 
 private:
+
+	void start_mission();
 	int _instance;
 	bool _armed;
 	bool _guided_mode;
 	bool _avoiding;
+	int _arming_delay;
+	bool _aborted;
 
 	Timer _heartbeat_timer;
 	UdpSource _mavlink_comm;

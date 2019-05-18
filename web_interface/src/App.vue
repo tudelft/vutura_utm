@@ -200,11 +200,17 @@ export default {
         endFlightButton.disabled = true;
       } else if (state == "flight authorized") {
         requestAedButton.disabled = true;
-        abortAedButton.disabled = true;
+        abortAedButton.disabled = false;
         requestFlightButton.disabled = true;
         startFlightButton.disabled = false;
         endFlightButton.disabled = true;
       } else if (state == "flight started") {
+        requestAedButton.disabled = true;
+        abortAedButton.disabled = false;
+        requestFlightButton.disabled = true;
+        startFlightButton.disabled = true;
+        endFlightButton.disabled = false;
+      } else if (state == "armed") {
         requestAedButton.disabled = true;
         abortAedButton.disabled = true;
         requestFlightButton.disabled = true;
