@@ -41,6 +41,7 @@ private:
 	Replier _avoidance_rep;
 
 	Publisher _gps_pub;
+	Publisher _gps_json_pub;
 	Publisher _uav_armed_pub;
 
 	uint8_t _buffer[2041];

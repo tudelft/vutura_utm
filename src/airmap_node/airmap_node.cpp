@@ -72,6 +72,10 @@ void AirmapNode::handle_utm_sp(std::string request, std::string &reply)
 	if (request == "request_flight") {
 		request_flight();
 
+	} else if (request == "request_autoflight") {
+		_autostart_flight = true;
+		request_flight();
+
 	} else if (request == "start_flight") {
 		start_flight();
 

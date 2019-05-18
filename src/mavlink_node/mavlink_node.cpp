@@ -21,6 +21,7 @@ MavlinkNode::MavlinkNode(int instance) :
 	_uav_command_sub(this),
 	_avoidance_rep(this),
 	_gps_pub(socket_name(SOCK_PUBSUB_GPS_POSITION, instance)),
+	_gps_json_pub(socket_name(SOCK_PUBSUB_GPS_JSON, instance)),
 	_uav_armed_pub(socket_name(SOCK_PUBSUB_UAV_STATUS, instance))
 {
 
@@ -120,6 +121,16 @@ void MavlinkNode::handle_mavlink_message(mavlink_message_t *msg)
 
 		std::string gps_message_string = gps_message.SerializeAsString();
 		_gps_pub.publish(gps_message_string);
+
+		// send as json string
+		std::string gps_json_string = "{";
+		gps_json_string += "\"lat\": " + std::to_string(global_pos.lat) + ", ";
+		gps_json_string += "\"lon\": " + std::to_string(global_pos.lon) + ", ";
+		gps_json_string += "\"hdg\": " + std::to_string(global_pos.hdg) + ", ";
+		gps_json_string += "\"height\": " + std::to_string(global_pos.relative_alt) + "}";
+
+		_gps_json_pub.publish(gps_json_string);
+		std::cout << gps_json_string << std::endl;
 
 	} else if (msg->msgid == MAVLINK_MSG_ID_HEARTBEAT) {
 		// std::cout << "HB received" << std::endl;

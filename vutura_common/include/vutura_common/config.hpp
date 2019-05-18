@@ -15,3 +15,5 @@
 #define SOCK_PUBSUB_UAV_STATUS		"ipc:///tmp/uav_status"
 
 #define SOCK_REQREP_UTMSP_COMMAND       "ipc:///tmp/utmsp"
+
+#define SOCK_PUBSUB_GPS_JSON		"ipc:///tmp/gps_json"
