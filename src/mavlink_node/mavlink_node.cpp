@@ -129,13 +129,6 @@ void MavlinkNode::handle_mavlink_message(mavlink_message_t *msg)
 		mavlink_global_position_int_t global_pos;
 		mavlink_msg_global_position_int_decode(msg, &global_pos);
 
-		static unsigned int skip_counter = 0;
-		if (skip_counter <= 20) {
-			skip_counter++;
-			return;
-		}
-		skip_counter = 0;
-
 		//printf("[mavlink_node] got global position lat: %f lon: %f alt_msl: %f alt_agl: %f\n", global_pos.lat * 1e-7, global_pos.lon * 1e-7, global_pos.alt * 1e-3, global_pos.relative_alt * 1e-3);
 		GPSMessage gps_message;
 		uint16_t len;
@@ -149,9 +142,6 @@ void MavlinkNode::handle_mavlink_message(mavlink_message_t *msg)
 		gps_message.set_ve(global_pos.vy * 10);
 		gps_message.set_vd(global_pos.vz * 10);
 
-		std::string gps_message_string = gps_message.SerializeAsString();
-		_gps_pub.publish(gps_message_string);
-
 		// send as json string
 		std::string gps_json_string = "{";
 		gps_json_string += "\"lat\": " + std::to_string(global_pos.lat) + ", ";
@@ -160,7 +150,17 @@ void MavlinkNode::handle_mavlink_message(mavlink_message_t *msg)
 		gps_json_string += "\"height\": " + std::to_string(global_pos.relative_alt) + "}";
 
 		_gps_json_pub.publish(gps_json_string);
-//		std::cout << gps_json_string << std::endl;
+
+		static unsigned int skip_counter = 0;
+		if (skip_counter <= 20) {
+			skip_counter++;
+			return;
+		}
+		skip_counter = 0;
+
+		std::string gps_message_string = gps_message.SerializeAsString();
+		_gps_pub.publish(gps_message_string);
+
 
 	} else if (msg->msgid == MAVLINK_MSG_ID_HEARTBEAT) {
 		// std::cout << "HB received" << std::endl;
