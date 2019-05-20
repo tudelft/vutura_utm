@@ -87,6 +87,13 @@ void MavlinkNode::periodic()
 		_arming_delay++;
 		// make sound
 		std::cout << "Play beep " << std::to_string(_arming_delay) << std::endl;
+		if (_arming_delay < 16) {
+			play_tune(14);
+		} else if (_arming_delay == 16) {
+			play_tune(8);
+		} else if (_arming_delay >= 19) {
+			play_tune(12);
+		}
 	}
 
 	if (_arming_delay == 20) {
@@ -123,7 +130,12 @@ void MavlinkNode::handle_udp_packet(std::string packet)
 
 void MavlinkNode::handle_mavlink_message(mavlink_message_t *msg)
 {
-	//printf("[%s] incoming msg SYS: %d, COMP: %d, LEN: %d, MSGID: %d\n", node->name, msg->sysid, msg->compid, msg->len, msg->msgid);
+	//printf("[mavlink_node] incoming msg SYS: %d, COMP: %d, LEN: %d, MSGID: %d\n", msg->sysid, msg->compid, msg->len, msg->msgid);
+
+	if (msg->sysid != 1 && msg->compid != 1) {
+		// message not from MAV
+		return;
+	}
 
 	if (msg->msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
 		mavlink_global_position_int_t global_pos;
@@ -250,8 +262,6 @@ void MavlinkNode::set_armed_state(bool armed)
 	uavhb.set_aborted(_aborted);
 	std::string message_string = uavhb.SerializeAsString();
 	_uav_armed_pub.publish(message_string);
-
-
 }
 
 void MavlinkNode::set_guided_state(bool guided_mode_enabled)
@@ -286,6 +296,23 @@ void MavlinkNode::enable_offboard(bool offboard)
 
 	std::string packet((char*)_buffer, len);
 	_mavlink_comm.send_packet(packet);
+}
+
+void MavlinkNode::play_tune(int tune_nr)
+{
+	// try sending beep command
+	char buf[70] = {0};
+	ssize_t buflen = sprintf(buf, "tune_control play -t %d\n", tune_nr);
+
+	std::cout << "Send \"" << buf << "\"" << std::endl;
+//	memcpy(buf, command, sizeof(command));
+	mavlink_message_t msg;
+	mavlink_msg_serial_control_pack(255, 200, &msg, SERIAL_CONTROL_DEV_SHELL, /* SERIAL_CONTROL_FLAG_EXCLUSIVE | */ SERIAL_CONTROL_FLAG_RESPOND, 0, 0, buflen, (uint8_t*)buf);
+	uint16_t len = mavlink_msg_to_send_buffer(_buffer, &msg);
+
+	std::string packet((char*)_buffer, len);
+	_mavlink_comm.send_packet(packet);
+
 }
 
 void MavlinkNode::start_mission()

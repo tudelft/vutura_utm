@@ -32,6 +32,7 @@ public:
 
 private:
 
+	void play_tune(int tune_nr);
 	void start_mission();
 	int _instance;
 	bool _armed;

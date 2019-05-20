@@ -223,14 +223,15 @@ int AirmapNode::set_armed(bool new_armed_state)
 		update_state(STATE_ARMED);
 	}
 
-	if (_state == STATE_ARMED && new_armed_state == false) {
+	if (_state == STATE_ARMED && !new_armed_state) {
 		update_state(STATE_FLIGHT_STARTED);
 	}
 
 	if (new_armed_state != _armed) {
 
-		if (new_armed_state == true) {
+		if (new_armed_state) {
 			// arm event
+			std::cout << "Arm event" << std::endl;
 
 		} else {
 			// disarm event
