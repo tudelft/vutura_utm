@@ -31,10 +31,10 @@ void PaparazziNode::init()
 
 void PaparazziNode::pprz_callback(std::string packet)
 {
-	std::cout << "Got UDP data" << std::endl;
+	std::cout << "Got UDP data with size: " << packet.length() << std::endl;
 
 	if (packet.length() == sizeof(PaparazziToVuturaMsg)) {
-		strcpy((char*)&_gpos_msg, packet.c_str());
+		memcpy((char*)&_gpos_msg, packet.c_str(), packet.length());
 		GPSMessage msg;
 		msg.set_timestamp(0);
 		msg.set_lat(_gpos_msg.lat);
@@ -46,7 +46,6 @@ void PaparazziNode::pprz_callback(std::string packet)
 		msg.set_vd(_gpos_msg.Vd);
 		std::string gps_message = msg.SerializeAsString();
 		_position_publisher.publish(gps_message);
-		std::cout << "lat: " << _gpos_msg.lat << "\tlon: " << _gpos_msg.lon << std::endl;
 	}
 }
 
@@ -67,8 +66,8 @@ int PaparazziNode::handle_avoidance(AvoidanceVelocity avoidance_velocity)
         msg.vn = avoidance_velocity.vn();
         msg.ve = avoidance_velocity.ve();
         msg.vd = avoidance_velocity.vd();
-
-        std::cout << "TEST: " << msg.vn << std::endl;
+	msg.lat = avoidance_velocity.lat();
+	msg.lon = avoidance_velocity.lon();
 
 	std::string packet((char*)&msg, sizeof(msg));
 	_pprz_comm.send_packet(packet);

@@ -25,9 +25,11 @@ typedef union paparazzi_to_vutura_msg_t PaparazziToVuturaMsg;
 union vutura_to_paparazzi_msg_t {
         struct  {
                 bool avoid;
-                int32_t vn;
-                int32_t ve;
-                int32_t vd;
+		int32_t vn;
+		int32_t ve;
+		int32_t vd;
+		int32_t lat; //[dege7]
+		int32_t lon; //[dege7]
         };
 	unsigned char bytes;
 } __attribute((__packed__));
