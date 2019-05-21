@@ -42,5 +42,5 @@ void calc_position_from_reference(position_params& reference_pos, latdlond& targ
 	double diff_lond = diff_lon / M_PI * 180.;
 
 	target_latdlond.latd = reference_pos.latd + diff_latd;
-	target_latdlond.lond = reference_pos.lond = diff_lond;
+	target_latdlond.lond = reference_pos.lond + diff_lond;
 }
