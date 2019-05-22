@@ -110,10 +110,8 @@ int UniflyNode::login()
 
 	os.close();
 
-//	get_user_id();
-//	return 0;
 	request_flight();
-//	sleep(2); // beun, validation
+
 	get_validation_results();
 	get_action_items();
 	//get_permission(_permission_uuid);
@@ -160,15 +158,21 @@ int UniflyNode::request_flight()
 	request["properties"]["lowerLimit"] = 0;
 	request["properties"]["upperLimit"] = 120;
 	request["properties"]["name"] = "TU Delft";
+//	request["properties"]["environment"] = "RURAL";
+	request["properties"]["purpose"] = "ROC";
+	request["properties"]["rulesetCode"] = "ROC";
+	request["properties"]["lineOfSightType"] = "B-VLOS";
+	request["properties"]["pilotMobile"] = "0";
+	request["properties"]["pilotUuid"] = _user_uuid;
 	request["properties"]["crew"]["pilot"] = _user_uuid;
 	request["properties"]["crew"]["user"] = _user_uuid;
 	request["properties"]["uas"] = _uas_uuid;
-//	request["properties"]["takeOffPosition"] = nlohmann::json({});
-//	request["properties"]["landPosition"] = nlohmann::json({});
+	request["properties"]["takeOffPosition"] = nlohmann::json({});
+	request["properties"]["landPosition"] = nlohmann::json({});
 
 
 
-	//std::cout << request.dump(4) << std::endl;
+//	std::cout << request.dump(4) << std::endl;
 
 	_comm.clear_headers();
 	_comm.add_header("authorization", "Bearer " + _access_token);
@@ -285,7 +289,7 @@ int UniflyNode::get_action_items()
 	} catch (...) {
 	}
 
-	//std::cout << result.dump(4) << std::endl;
+	std::cout << result.dump(4) << std::endl;
 
 	// request permission for action items
 
