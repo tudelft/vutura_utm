@@ -10,6 +10,9 @@ utm_status_sub.connect('ipc:///tmp/utm_status_update_0')
 var gps_json_sub = nano.socket('sub');
 gps_json_sub.connect('ipc:///tmp/gps_json_0')
 
+var mavlink_command_pub = nano.socket('pub');
+mavlink_command_pub.bind('ipc:///tmp/direct_mav_command_sub_0');
+
 utm_sp_req.on('data', function (buf) {
 	console.log('received response: ', buf.toString());
 	io.emit('utmsp_response', buf.toString());
@@ -51,6 +54,26 @@ io.on('connection', function(client) {
 
 	client.on('abort_autoflight', () => {
 		utm_sp_req.send('abort_autoflight');
+	});
+
+	client.on('kill kill kill', () => {
+		console.log('kill kill kill');
+		mavlink_command_pub.send('kill kill kill');
+	});
+
+	client.on('pause', () => {
+		console.log('pause');
+		mavlink_command_pub.send('pause');
+	});
+
+	client.on('continue', () => {
+		console.log('continue');
+		mavlink_command_pub.send('continue');
+	});
+
+	client.on('land here', () => {
+		console.log('land here');
+		mavlink_command_pub.send('land here');
 	});
 });
 

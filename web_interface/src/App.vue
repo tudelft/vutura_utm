@@ -64,6 +64,12 @@
     </div>
     <div class="row" style="margin-top: 100px"></div>
     <div class="column">
+      <button id="mavPause" @click="mavPause">Pause</button>
+      <button id="mavContinue" @click="mavContinue">Continue</button>
+      <button id="mavLandHere" @click="mavLandHere">Land here</button>
+    </div>
+    <div class="row" style="margin-top: 100px"></div>
+    <div class="column">
       <button
         id="requestFlightButton"
         disabled="disabled"
@@ -174,6 +180,18 @@ export default {
       this.$socket.emit("abort_autoflight");
       console.log("Abort autoflight");
       this.abortAedPromise = this.dummyAsyncAction();
+    },
+    mavPause() {
+      console.log("pause");
+      this.$socket.emit("pause");
+    },
+    mavContinue() {
+      console.log("continue");
+      this.$socket.emit("continue");
+    },
+    mavLandHere() {
+      console.log("land here");
+      this.$socket.emit("land here");
     },
     updateState(state) {
       this.utm_state = state;

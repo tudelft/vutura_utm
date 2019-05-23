@@ -22,6 +22,7 @@ MavlinkNode::MavlinkNode(int instance) :
 	_mavlink_comm(this),
 	_uav_command_sub(this),
 	_avoidance_rep(this),
+	_direct_mav_command_sub(this),
 	_gps_pub(socket_name(SOCK_PUBSUB_GPS_POSITION, instance)),
 	_gps_json_pub(socket_name(SOCK_PUBSUB_GPS_JSON, instance)),
 	_uav_armed_pub(socket_name(SOCK_PUBSUB_UAV_STATUS, instance))
@@ -47,6 +48,10 @@ void MavlinkNode::init()
 
 	_avoidance_rep.set_receive_callback(std::bind(&MavlinkNode::handle_avoidance_command, this, _1, _2));
 	_avoidance_rep.listen(socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, _instance));
+
+	// same as uav command
+	_direct_mav_command_sub.set_receive_callback(std::bind(&MavlinkNode::uav_command, this, _1));
+	_direct_mav_command_sub.subscribe(socket_name(SOCK_SUB_DIRECT_MAV_COMMAND, _instance));
 }
 
 void MavlinkNode::uav_command(std::string command)
@@ -72,6 +77,18 @@ void MavlinkNode::uav_command(std::string command)
 
 	} else if (command == "HB") {
 		// do nothing
+
+	} else if (command == "kill kill kill") {
+		std::cout << "kill not implemented yet" << std::endl;
+
+	} else if (command == "pause") {
+		send_command_hold();
+
+	} else if (command == "continue") {
+		send_command_continue();
+
+	} else if (command == "land here") {
+		send_command_land();
 
 	} else {
 		std::cout << "Received: " << command << std::endl;
@@ -324,4 +341,51 @@ void MavlinkNode::start_mission()
 	std::string packet((char*)_buffer, len);
 	_mavlink_comm.send_packet(packet);
 
+}
+
+void MavlinkNode::send_mavlink_message(mavlink_message_t *msg)
+{
+	uint16_t len = mavlink_msg_to_send_buffer(_buffer, msg);
+	std::string packet((char*)_buffer, len);
+	_mavlink_comm.send_packet(packet);
+}
+
+void MavlinkNode::send_command_hold()
+{
+	std::cout << "pause" << std::endl;
+	mavlink_message_t msg;
+	mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_DO_SET_MODE, 0,
+				      MAV_MODE_FLAG_CUSTOM_MODE_ENABLED | MAV_MODE_FLAG_AUTO_ENABLED | MAV_MODE_FLAG_GUIDED_ENABLED | MAV_MODE_FLAG_STABILIZE_ENABLED,
+				      MAV_MODE_FLAG_AUTO_ENABLED, 3, 0, 0, 0, 0);
+	return send_mavlink_message(&msg);
+}
+
+void MavlinkNode::send_command_continue()
+{
+	// 29 4 4
+	std::cout << "continue" << std::endl;
+	mavlink_message_t msg;
+	mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_DO_SET_MODE, 0,
+				      MAV_MODE_FLAG_CUSTOM_MODE_ENABLED | MAV_MODE_FLAG_AUTO_ENABLED | MAV_MODE_FLAG_GUIDED_ENABLED | MAV_MODE_FLAG_STABILIZE_ENABLED,
+				      MAV_MODE_FLAG_AUTO_ENABLED, 4, 0, 0, 0, 0);
+	return send_mavlink_message(&msg);
+}
+
+void MavlinkNode::send_command_land()
+{
+	// 157 4 6
+	std::cout << "land" << std::endl;
+	mavlink_message_t msg;
+	mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_DO_SET_MODE, 0,
+				      MAV_MODE_FLAG_CUSTOM_MODE_ENABLED | MAV_MODE_FLAG_AUTO_ENABLED | MAV_MODE_FLAG_GUIDED_ENABLED | MAV_MODE_FLAG_STABILIZE_ENABLED,
+				      MAV_MODE_FLAG_AUTO_ENABLED, 6, 0, 0, 0, 0);
+	return send_mavlink_message(&msg);
+}
+
+void MavlinkNode::send_command_disarm()
+{
+	std::cout << "CMD DISARM" << std::endl;
+	mavlink_message_t msg;
+	mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_COMPONENT_ARM_DISARM, 0, 0, 0, 0, 0, 0, 0, 0);
+	return send_mavlink_message(&msg);
 }

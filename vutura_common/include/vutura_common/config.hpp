@@ -17,3 +17,4 @@
 #define SOCK_REQREP_UTMSP_COMMAND       "ipc:///tmp/utmsp"
 
 #define SOCK_PUBSUB_GPS_JSON		"ipc:///tmp/gps_json"
+#define SOCK_SUB_DIRECT_MAV_COMMAND	"ipc:///tmp/direct_mav_command_sub"

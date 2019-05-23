@@ -34,6 +34,11 @@ private:
 
 	void play_tune(int tune_nr);
 	void start_mission();
+	void send_mavlink_message(mavlink_message_t *msg);
+	void send_command_hold();
+	void send_command_continue();
+	void send_command_land();
+	void send_command_disarm();
 	int _instance;
 	bool _armed;
 	bool _guided_mode;
@@ -45,6 +50,7 @@ private:
 	UdpSource _mavlink_comm;
 	Subscriber _uav_command_sub;
 	Replier _avoidance_rep;
+	Subscriber _direct_mav_command_sub;
 
 	Publisher _gps_pub;
 	Publisher _gps_json_pub;
