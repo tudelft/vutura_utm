@@ -11,16 +11,18 @@ using namespace std::placeholders;
 
 UniflyNode::UniflyNode(int instance, UniflyConfig *config) :
 	_instance(instance),
+	_state(STATE_INIT),
 	_config(config),
 	_periodic_timer(this),
 	_gps_position_sub(this),
 	_command_replier(this),
+	_pub_utm_status_update(socket_name(SOCK_PUBSUB_UTM_STATUS_UPDATE, _instance)),
 	_lat(0.0),
 	_lon(0.0),
 	_alt_msl(0.0),
 	_alt_agl(0.0),
 	_has_position_data(false),
-	_takeoff(false)
+	_streaming(false)
 {
 	// hard-coded for now, can also be requested through the api
 //	_uas_uuid = "e6755d9f-1b83-4993-a121-aaeab695996a"; // vutura iris
@@ -65,13 +67,25 @@ void UniflyNode::handle_command(std::string request, std::string &reply)
 		reply = "taking off";
 		send_takeoff();
 
+	} else if (request == "request_flight") {
+		request_flight();
+		reply = _operation_unique_identifier;
+
+	} else if (request == "start_flight") {
+		start_flight();
+		reply = "starting";
+
+	} else if (request == "end_flight") {
+		end_flight();
+		reply = "ending";
+
+	} else if (request == "cancel_flight") {
+		reply = "cancelling";
+		send_cancel_permission();
+
 	} else if (request == "action_items") {
 		reply = "getting action items";
 		get_action_items();
-
-	} else if (request == "cancel") {
-		reply = "cancelling";
-		send_cancel_permission();
 
 	} else if (request == "get_traffic_channels") {
 		reply = "getting channels";
@@ -115,17 +129,26 @@ int UniflyNode::login()
 //	_operation_unique_identifier = "7dfaf9e8-6c46-4b14-8ac4-a30d78b31e1b";
 //	send_land();
 
-	request_flight();
+//	request_flight();
+//	get_validation_results();
+//	get_action_items();
 
-	get_validation_results();
-	get_action_items();
+	end_active_flights();
+
+
 	//get_permission(_permission_uuid);
+	update_state(STATE_LOGGED_IN);
 
 	return 0;
 }
 
 int UniflyNode::request_flight()
 {
+	if (_state != STATE_LOGGED_IN) {
+		std::cerr << "Need to be in logged in state" << std::endl;
+		return -1;
+	}
+
 	time_t current_time;
 	time(&current_time);
 	char now[21];
@@ -213,6 +236,20 @@ int UniflyNode::request_flight()
 		std::cerr << "No position data available" << std::endl;
 		return -1;
 	}
+
+	// Check if permission is needed
+	get_validation_results();
+	get_action_items();
+
+	// request the permission if needed
+	if (_permission_uuid == "") {
+		update_state(STATE_FLIGHT_AUTHORIZED);
+	} else {
+		request_permission(_permission_uuid);
+		update_state(STATE_FLIGHT_REQUESTED);
+	}
+
+	return 0;
 }
 
 int UniflyNode::get_user_id()
@@ -294,20 +331,29 @@ int UniflyNode::get_action_items()
 	} catch (...) {
 	}
 
-	std::cout << result.dump(4) << std::endl;
+	//std::cout << result.dump(4) << std::endl;
 
 	// request permission for action items
+	std::string action_item_status;
 
 	for (nlohmann::json::iterator it = result.begin(); it != result.end(); ++it) {
-	  std::cout << *it << '\n';
+	  //std::cout << *it << '\n';
 	  _permission_uuid = (*it)["uniqueIdentifier"].get<std::string>();
-	  std::cout << "Action item permission UUID: " << _permission_uuid << std::endl;
+	  action_item_status = (*it)["status"].get<std::string>();
+	  //std::cout << "Action item permission UUID: " << _permission_uuid << std::endl;
+	  std::cout << "Permission status: " << action_item_status << std::endl;
 //	  std::cout << (*it).dump(4) << std::endl;
+	}
+
+	if (action_item_status == "APPROVED") {
+		update_state(STATE_FLIGHT_AUTHORIZED);
+	} else if (action_item_status == "REJECTED") {
+		update_state(STATE_LOGGED_IN);
 	}
 
 }
 
-int UniflyNode::get_permission(std::string uuid)
+int UniflyNode::request_permission(std::string uuid)
 {
 
 	_comm.clear_headers();
@@ -339,6 +385,7 @@ int UniflyNode::get_permission(std::string uuid)
 		std::cout << result.dump(4) << std::endl;
 	} catch (...) {
 		std::cout << "Could not parse response" << std::endl;
+		return -1;
 	}
 }
 
@@ -474,9 +521,10 @@ int UniflyNode::send_takeoff()
 	} catch (...) {
 		std::cout << "Could not parse response" << std::endl;
 		std::cout << res << std::endl;
+		return -1;
 	}
 
-	_takeoff = true;
+	_streaming = true;
 	return 0;
 }
 
@@ -493,7 +541,7 @@ int UniflyNode::send_land()
 		return -1;
 	}
 
-	if (!_takeoff) {
+	if (!_streaming) {
 		std::cerr << "Not yet taken off" << std::endl;
 		return -1;
 	}
@@ -522,9 +570,10 @@ int UniflyNode::send_land()
 		std::cout << result.dump(4) << std::endl;
 	} catch (...) {
 		std::cout << "Could not parse response" << std::endl;
+		return -1;
 	}
 
-	_takeoff = false;
+	_streaming = false;
 	return 0;
 
 }
@@ -552,8 +601,10 @@ int UniflyNode::send_cancel_permission()
 		std::cout << "Cancell permission, new status: " << result["status"] << std::endl;
 	} catch (...) {
 		std::cout << "Could not parse response" << std::endl;
+		return -1;
 	}
 
+	update_state(STATE_FLIGHT_CANCELLED);
 
 	return 0;
 
@@ -575,11 +626,18 @@ int UniflyNode::set_position(float latitude, float longitude, float alt_msl, flo
 
 int UniflyNode::periodic()
 {
+	if (_state == STATE_FLIGHT_REQUESTED) {
+		get_action_items();
+	}
+
+	std::string state = state_name(_state);
+	_pub_utm_status_update.publish(state);
+
 	// send position?
-	if (_operation_unique_identifier != "" && _has_position_data && _takeoff) {
+	if (_operation_unique_identifier != "" && _has_position_data && _streaming && _state >= STATE_FLIGHT_RESCINDED) {
 		send_tracking_position();
 	} else {
-		std::cout << "Not sending, no position/takeoff?" << std::endl;
+//		std::cout << "Not sending, no position/takeoff?" << std::endl;
 	}
 }
 
@@ -588,4 +646,120 @@ uint64_t UniflyNode::get_timestamp()
 	struct timeval tp;
 	gettimeofday(&tp, NULL);
 	return static_cast<std::uint64_t>(tp.tv_sec) * 1000L + tp.tv_usec / 1000;
+}
+
+void UniflyNode::update_state(UniflyNode::UniflyState new_state)
+{
+	if (new_state == STATE_LOGGED_IN) {
+		// clear data
+		_permission_uuid = "";
+		_operation_unique_identifier = "";
+	}
+	_state = new_state;
+
+	std::string state = state_name(_state);
+	_pub_utm_status_update.publish(state);
+}
+
+int UniflyNode::start_flight()
+{
+	if (_state >= STATE_FLIGHT_RESCINDED) {
+		std::cerr << "Already taken off" << std::endl;
+		return -1;
+	}
+	if (send_takeoff() == 0) {
+		update_state(STATE_FLIGHT_STARTED);
+	}
+}
+
+int UniflyNode::end_flight()
+{
+	if (_state >= STATE_FLIGHT_RESCINDED) {
+		if (send_land() == 0) {
+			update_state(STATE_LOGGED_IN);
+		}
+	}
+}
+
+int UniflyNode::end_active_flights()
+{
+	_comm.clear_headers();
+	_comm.add_header("authorization", "Bearer " + _access_token);
+	_comm.add_header("content-type", "application/json");
+
+	std::string url = "https://" + _config->host() +  "/api/uasoperations/?$filter=supersededBy%20eq%20%22null%22%20and%20(uas.status%20eq%20%22IN_FLIGHT%22)&$orderby=uas.status,geoZone.endTime,geoZone.startTime%20desc&$count=1&$skip=0";
+
+	std::string res;
+	_comm.get(url.c_str(), res);
+
+	nlohmann::json result;
+	try {
+		result = nlohmann::json::parse(res);
+
+	} catch (...) {
+	}
+
+	//std::cout << result.dump(4) << std::endl;
+
+	try {
+		for (nlohmann::json::iterator it = result.begin(); it != result.end(); ++it) {
+//		  std::cout << *it << '\n';
+//		  std::cout << "UUID: " << action_item_status << std::endl;
+//		  std::cout << "NEXT: " << (*it).dump(4) << std::endl;
+		  _operation_unique_identifier = (*it)["uniqueIdentifier"].get<std::string>();
+		  _streaming = true;
+		  std::cout << "Ending flight: " << _operation_unique_identifier << std::endl;
+		  send_land();
+		  _operation_unique_identifier = "";
+		  _streaming = false;
+		}
+
+	} catch (...) {
+
+	}
+}
+
+std::string UniflyNode::state_name(UniflyNode::UniflyState state)
+{
+	std::string state_name = "";
+	switch (state) {
+	case STATE_INIT:
+		state_name = "init";
+		break;
+
+	case STATE_LOGGED_IN:
+		state_name = "logged in";
+		break;
+
+	case STATE_FLIGHT_REQUESTED:
+		state_name = "flight requested";
+		break;
+
+	case STATE_FLIGHT_AUTHORIZED:
+		state_name = "flight authorized";
+		break;
+
+	case STATE_FLIGHT_STARTED:
+		// serial number
+		state_name = "flight started";
+		break;
+
+	case STATE_FLIGHT_RESCINDED:
+		state_name = "flight rescinded";
+		break;
+
+	case STATE_FLIGHT_CANCELLED:
+		state_name = "flight cancelled";
+		break;
+
+	case STATE_ARMED:
+		state_name = "armed";
+		break;
+
+	default:
+		state_name = "unknown state";
+		break;
+	}
+
+	return state_name;
 }

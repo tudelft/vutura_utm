@@ -11,7 +11,7 @@ import dateutil.parser
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
 traffic_pub = nanomsg.Socket(nanomsg.PUB)
-traffic_pub.bind('tcp://127.0.0.1:8340'.encode('utf-8'))
+traffic_pub.bind('tcp://0.0.0.0:8340'.encode('utf-8'))
 
 def onconnect(socket):
     logging.info("on connect got called")

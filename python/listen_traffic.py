@@ -7,7 +7,7 @@ import time
 #s1 = Socket(PUB)
 #s1.bind('ipc:///tmp/traffic_info.sock'.encode('utf-8'))
 s2 = Socket(SUB)
-s2.connect('ipc:///tmp/traffic_info.sock'.encode('utf-8'))
+s2.connect('tcp://10.11.0.1:8340'.encode('utf-8'))
 s2.set_string_option(SUB, SUB_SUBSCRIBE, ''.encode('utf-8'))
 
 #print("send something")
