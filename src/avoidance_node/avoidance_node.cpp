@@ -2,6 +2,7 @@
 #include <cmath>
 #include <iomanip>
 #include <algorithm>
+#include <array>
 #include "sys/time.h"
 
 #include "vutura_common.pb.h"
@@ -540,7 +541,6 @@ int AvoidanceNode::SSDResolution()
 	{
 		n_e_coordinate relative_wp = _avoidance_geometry.getRelWpNorthEast(_own_pos, _target_wp);
 		double rel_hdg = atan2(relative_wp.east, relative_wp.north);
-		std::cout << "rel_hdg: " << rel_hdg / M_PI * 180. << std::endl;
 		vn_scaled = Scale_to_clipper(_SSD_c.vset * cos(rel_hdg));
 		ve_scaled = Scale_to_clipper(_SSD_c.vset * sin(rel_hdg));
 	}
@@ -637,6 +637,82 @@ int AvoidanceNode::SSDResolution()
 		_avoidance_pub.publish(avoidance_message);
 	}
 	return 0;
+}
+
+ClipperLib::Paths AvoidanceNode::ConstructGeofencePolygons(Avoidance_intruder &intruder)
+{
+	ClipperLib::Paths geofence_polygons;
+	double ref_r		= _own_pos.r;
+	double ref_coslat	= _own_pos.coslat;
+	double p_int_n		= intruder.getPnRel();
+	double p_int_e		= intruder.getPeRel();
+	double v_int_n		= intruder.getVn();
+	double v_int_e		= intruder.getVe();
+
+	std::vector<std::vector<double>> geofence_ll = _avoidance_geometry.getGeofenceLatdLond();
+	std::vector<n_e_coordinate> geofence_ne;
+
+	for (size_t i = 0; i < geofence_ll.size(); i++)
+	{
+		double lat_diff = geofence_ll.at(i)[1] - _own_pos.lat;
+		double lon_diff = geofence_ll.at(i)[0] - _own_pos.lon;
+
+		n_e_coordinate geo_ne;
+		geo_ne.north	= lat_diff * ref_r;
+		geo_ne.east	= lon_diff * ref_r * ref_coslat;
+
+		geofence_ne.push_back(geo_ne);
+	}
+
+	std::vector<geofence_sector> geofence_sections;
+
+	for (size_t i = 0; i < geofence_ne.size(); i++)
+	{
+		size_t i_next;
+		if (i == (geofence_ne.size() - 1))
+		{
+			i_next = 0;
+		}
+		else
+		{
+			i_next = i + 1;
+		}
+		std::array<n_e_coordinate,2> coordinates_ne;
+		coordinates_ne[0] = geofence_ne.at(i);
+		coordinates_ne[1] = geofence_ne.at(i_next);
+		geofence_sector geo_sec = calc_geofence_sector_from_n_e(coordinates_ne);
+		geofence_sections.push_back(geo_sec);
+	}
+
+	for (size_t i = 0; i < geofence_sections.size(); i++)
+	{
+		double rotation_geo	= geofence_sections.at(i).rotation;
+		double v_int_perp	= v_int_n * cos(rotation_geo) - v_int_e * sin(rotation_geo);
+		double v_int_parallel	= v_int_e * cos(rotation_geo) + v_int_n * sin(rotation_geo);
+		double d_geo		= geofence_sections.at(i).dist;
+		double p_int_parallel	= p_int_e * cos(rotation_geo) + p_int_n * sin(rotation_geo);
+		double p_int_perp	= p_int_n * cos(rotation_geo) - p_int_e * sin(rotation_geo);
+		double phi		= 0.5 * atan2(-p_int_parallel, p_int_perp);
+		double sinphi		= sin(phi);
+		double cosphi		= cos(phi);
+		double sinphi2		= pow(sinphi,2);
+		double cosphi2		= pow(cosphi,2);
+
+		double K_2_parallel	= 1. - p_int_perp / d_geo * sinphi2 / (cosphi2 - sinphi2);
+		double K_parallel	= -sinphi * v_int_perp * (2. + p_int_perp / d_geo);
+		double c_parallel	= -K_parallel / (2. * K_2_parallel);
+
+		double K_2_perp		= 1. + p_int_perp / d_geo * cosphi2 / (cosphi2 - sinphi2);
+		double K_perp		= -cosphi * v_int_perp * (2. + p_int_perp / d_geo);
+		double c_perp		= -K_perp / (2. * K_2_perp);
+
+		double K		= pow(c_parallel,2) * K_2_parallel + pow(c_perp,2) * K_2_perp - pow(v_int_perp,2);
+
+		double a2		= K / K_2_parallel;
+		double b2		= K / K_2_perp;
+	}
+
+	return geofence_polygons;
 }
 
 int AvoidanceNode::ResumeNav()

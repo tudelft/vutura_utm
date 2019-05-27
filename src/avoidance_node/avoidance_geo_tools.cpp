@@ -67,3 +67,27 @@ n_e_coordinate calc_northeast_from_reference(position_params& reference_pos, lat
 
 	return target_ne;
 }
+
+geofence_sector calc_geofence_sector_from_n_e(std::array<n_e_coordinate,2>& n_e)
+{
+	geofence_sector geofence_s;
+	geofence_s.north_east		= n_e;
+	geofence_s.a			= geofence_s.north_east[0];
+
+	n_e_coordinate diff;
+	diff.north			= n_e[1].north - n_e[0].north;
+	diff.east			= n_e[1].east  - n_e[0].east;
+	double len_diff			= sqrt(pow(diff.north,2) + pow(diff.east, 2));
+
+	geofence_s.n.north		= diff.north / len_diff;
+	geofence_s.n.east		= diff.east  / len_diff;
+
+	double dot_a_n			= geofence_s.a.north * geofence_s.n.north + geofence_s.a.east * geofence_s.n.east;
+	geofence_s.distv.north		= geofence_s.a.north - dot_a_n * geofence_s.n.north;
+	geofence_s.distv.east		= geofence_s.a.east  - dot_a_n * geofence_s.n.east;
+
+	geofence_s.dist			= sqrt(pow(geofence_s.distv.north,2) + pow(geofence_s.distv.east,2));
+
+	geofence_s.rotation		= atan2(geofence_s.distv.north, geofence_s.distv.east) - 0.5 * M_PI;
+	return geofence_s;
+}

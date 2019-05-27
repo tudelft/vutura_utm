@@ -70,3 +70,8 @@ struct n_e_coordinate Avoidance_geometry::getRelWpNorthEast(position_params &pos
 
 	return rel_waypoint_ne;
 }
+
+std::vector<std::vector<double>> Avoidance_geometry::getGeofenceLatdLond()
+{
+	return _geofence;
+}

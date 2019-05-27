@@ -90,6 +90,7 @@ private:
 	signed long long Scale_to_clipper(double coord);
 	double Scale_from_clipper(double coord);
 	int ConstructSSD();
+	ClipperLib::Paths ConstructGeofencePolygons(Avoidance_intruder& intruder);
 	int SSDResolution();
 	int ResumeNav();
 

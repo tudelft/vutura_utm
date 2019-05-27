@@ -1,6 +1,8 @@
 #ifndef AVOIDANCE_GEO_TOOLS_H
 #define AVOIDANCE_GEO_TOOLS_H
 
+#include <array>
+
 struct position_params
 {
     double latd;
@@ -25,9 +27,19 @@ struct n_e_coordinate
 	double east;
 };
 
+struct geofence_sector
+{
+	std::array<n_e_coordinate,2> north_east;
+	n_e_coordinate a;
+	n_e_coordinate n;
+	n_e_coordinate distv;
+	double dist;
+	double rotation;
+};
+
 void update_position_params(position_params& pos, double latd, double lond, double alt);
 latdlond calc_latdlond_from_reference(position_params& reference_pos, n_e_coordinate& target_ne);
 n_e_coordinate calc_northeast_from_reference(position_params& reference_pos, latdlond& target_latdlond);
-
+geofence_sector calc_geofence_sector_from_n_e(std::array<n_e_coordinate,2>& n_e);
 
 #endif // AVOIDANCE_GEO_TOOLS_H
