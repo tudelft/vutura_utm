@@ -11,7 +11,7 @@
 #define SOCK_PUBSUB_UAV_COMMAND		"ipc:///tmp/uav_command"
 #define SOCK_REQREP_AVOIDANCE_COMMAND	"ipc:///tmp/avoidance_command"
 #define SOCK_PUBSUB_GPS_POSITION	"ipc:///tmp/gps_position"
-#define SOCK_PUBSUB_TRAFFIC_INFO	"ipc:///tmp/traffic_info"
+#define SOCK_PUBSUB_TRAFFIC_INFO	"tcp://10.11.0.1:8340"
 #define SOCK_PUBSUB_UAV_STATUS		"ipc:///tmp/uav_status"
 
 #define SOCK_REQREP_UTMSP_COMMAND       "ipc:///tmp/utmsp"

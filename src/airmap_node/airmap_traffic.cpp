@@ -16,7 +16,7 @@ AirmapTraffic::AirmapTraffic(int instance) :
 		std::cerr << "nng_pub0_open pub traffic: " << nng_strerror(rv) << std::endl;
 	}
 
-	if ((rv = nng_listen(_pub_traffic, socket_name(SOCK_PUBSUB_TRAFFIC_INFO, instance).c_str(), NULL, 0)) != 0) {
+	if ((rv = nng_listen(_pub_traffic, socket_name("ipc:///tmp/traffic_info", instance).c_str(), NULL, 0)) != 0) {
 		std::cerr << "nng_listen pub traffic: " << nng_strerror(rv) << std::endl;
 	}
 }

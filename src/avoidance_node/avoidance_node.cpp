@@ -50,7 +50,7 @@ void AvoidanceNode::init()
 	_periodic_timer.start_periodic(200);
 
 	_traffic_sub.set_receive_callback(std::bind(&AvoidanceNode::traffic_callback, this, _1));
-	_traffic_sub.subscribe(socket_name(SOCK_PUBSUB_TRAFFIC_INFO, _instance));
+	_traffic_sub.subscribe(SOCK_PUBSUB_TRAFFIC_INFO);
 
 	_gps_sub.set_receive_callback(std::bind(&AvoidanceNode::gps_position_callback, this, _1));
 	_gps_sub.subscribe(socket_name(SOCK_PUBSUB_GPS_POSITION, _instance));
