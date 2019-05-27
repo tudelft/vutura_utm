@@ -10,7 +10,9 @@ PaparazziNode::PaparazziNode(int instance) :
 	_instance(instance),
 	_pprz_comm(this),
 	_avoidance_sub(this),
-	_position_publisher(socket_name(SOCK_PUBSUB_GPS_POSITION, instance))
+	_position_publisher(socket_name(SOCK_PUBSUB_GPS_POSITION, instance)),
+	_utm_status_sub(this),
+	_utm_status("")
 {
 
 }
@@ -25,8 +27,11 @@ void PaparazziNode::init()
 	_pprz_comm.set_receive_callback(std::bind(&PaparazziNode::pprz_callback, this, _1));
 	_pprz_comm.connect(PPRZ_IP, PPRZ_PORT, 14551);
 
-	_avoidance_sub.subscribe(socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, _instance));
 	_avoidance_sub.set_receive_callback(std::bind(&PaparazziNode::avoidance_command_callback, this, _1));
+	_avoidance_sub.subscribe(socket_name(SOCK_REQREP_AVOIDANCE_COMMAND, _instance));
+
+	_utm_status_sub.set_receive_callback(std::bind(&PaparazziNode::utm_status_callback, this, _1));
+	_utm_status_sub.subscribe(socket_name(SOCK_PUBSUB_UTM_STATUS_UPDATE, _instance));
 }
 
 void PaparazziNode::pprz_callback(std::string packet)
@@ -57,6 +62,25 @@ void PaparazziNode::avoidance_command_callback(std::string message)
 	if (success)
 	{
 		handle_avoidance(avoidance_velocity);
+	}
+}
+
+void PaparazziNode::utm_status_callback(std::string status)
+{
+	if (_utm_status != status) {
+		_utm_status = status;
+		std::cout << "UTM status update: " << status << std::endl;
+
+		// Also do something with it.
+		// For example, switch flight plan block to notify user of authorized/rejected flight
+
+		// Some of the possible states are:
+		// "logged in"			Can do the request now, also for rejected
+		// "flight requested"		Waiting for permission
+		// "flight authorized"		Flight authorized
+		// "flight started"		Streaming position
+		// "flight rescinded"		ATC wants you to land
+		// "flight cancelled"		ATC landing request was confirmed
 	}
 }
 

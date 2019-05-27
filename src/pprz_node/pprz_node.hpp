@@ -44,7 +44,7 @@ public:
 	void init();
 	void pprz_callback(std::string packet);
 	void avoidance_command_callback(std::string message);
-
+	void utm_status_callback(std::string status);
 
 private:
 	int _instance;
@@ -52,6 +52,9 @@ private:
 	UdpSource _pprz_comm;
 	Subscriber _avoidance_sub;
 	Publisher _position_publisher;
+
+	Subscriber _utm_status_sub;
+	std::string _utm_status;
 
 	PaparazziToVuturaMsg _gpos_msg;
 
