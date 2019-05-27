@@ -53,8 +53,8 @@ def onTraffic(key, object):
             traffic_message.groundspeed = 0
             traffic_message.heading = 0
             traffic_pub.send(traffic_message.SerializeToString())
-            if (item["identification"] == "flight|G8ywkEn8JZ7N6hg2nywOXg8voKulqoa72wDYZyOHWBPanvQNDZk5"):
-                print(json.dumps(item, indent=4))
+            #if (item["identification"] == "flight|G8ywkEn8JZ7N6hg2nywOXg8voKulqoa72wDYZyOHWBPanvQNDZk5"):
+            print(json.dumps(item, indent=4))
     except:
         print("error parsing json")
 
@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     # read token from file
     f = open('/home/bart/unifly/token.txt', 'r')
-    token = f.readline()
+    token = f.readline().rstrip()
 
     onSetAuthentication(socket, token)
 
