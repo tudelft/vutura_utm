@@ -11,6 +11,7 @@
 #define AVOIDANCE_V_MAX 20.0
 #define AVOIDANCE_V_SET 12.0
 #define AVOIDANCE_LOGGING true
+#define AVOIDANCE_AVOID_TO_TARGET true
 
 class Avoidance_config {
 public:
@@ -27,6 +28,7 @@ public:
         double getVSet();
         bool getLogging();
         std::string getLogPrefix();
+	bool getAvoidToTarget();
     
 private:
 
@@ -40,4 +42,5 @@ private:
         double _v_set;
         bool _logging;
         std::string _log_prefix;
+	bool _avoid_to_target;
 };

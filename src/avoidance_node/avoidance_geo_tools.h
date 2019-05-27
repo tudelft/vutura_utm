@@ -19,7 +19,15 @@ struct latdlond
 	double lond;
 };
 
+struct n_e_coordinate
+{
+	double north;
+	double east;
+};
+
 void update_position_params(position_params& pos, double latd, double lond, double alt);
-void calc_position_from_reference(position_params& reference_pos, latdlond& target_latdlond, double pn, double pe);
+latdlond calc_latdlond_from_reference(position_params& reference_pos, n_e_coordinate& target_ne);
+n_e_coordinate calc_northeast_from_reference(position_params& reference_pos, latdlond& target_latdlond);
+
 
 #endif // AVOIDANCE_GEO_TOOLS_H

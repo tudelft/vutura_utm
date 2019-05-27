@@ -9,6 +9,7 @@ message GPSMessage {
   optional sint32 vn = 6; // [mm/s]
   optional sint32 ve = 7; // [mm/s]
   optional sint32 vd = 8; // [mm/s]
+  optional uint32 target_wp = 9; // index of active wp
 }
 
 message TrafficInfo {

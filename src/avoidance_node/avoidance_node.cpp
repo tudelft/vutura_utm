@@ -27,6 +27,8 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_vn(0),
 	_ve(0),
 	_vd(0),
+	_target_wp_available(0),
+	_target_wp(0),
 	_avoid(false),
 	_vn_sp(0),
 	_ve_sp(0),
@@ -57,18 +59,18 @@ void AvoidanceNode::init()
 int AvoidanceNode::InitialiseSSD()
 {
 	// Import configuration and copy relevant settings for SSD
-	const unsigned N_angle	  = _avoidance_config.getNAngle();
-	const double hsep	       = _avoidance_config.getRPZ();
-	const double margin	     = _avoidance_config.getRPZMar();
-	_SSD_c.hsepm		    = hsep * margin;
-	_SSD_c.alpham		   = 0.4999 * M_PI;
-	_SSD_c.vmin		     = std::max(0.1, _avoidance_config.getVMin());
-	_SSD_c.vmax		     = _avoidance_config.getVMax();
-	_SSD_c.vset		     = _avoidance_config.getVSet();
-	const double vset_out	   = _SSD_c.vset + 0.1;
+	const unsigned N_angle		= _avoidance_config.getNAngle();
+	const double hsep		= _avoidance_config.getRPZ();
+	const double margin		= _avoidance_config.getRPZMar();
+	_SSD_c.hsepm			= hsep * margin;
+	_SSD_c.alpham			= 0.4999 * M_PI;
+	_SSD_c.vmin			= std::max(0.1, _avoidance_config.getVMin());
+	_SSD_c.vmax			= _avoidance_config.getVMax();
+	_SSD_c.vset			= _avoidance_config.getVSet();
+	const double vset_out		= _SSD_c.vset + 0.1;
 
-	double angle_step = 2. * M_PI / N_angle;
-	double angle = 0.;
+	double angle_step	= 2. * M_PI / N_angle;
+	double angle		= 0.;
 	double cos_angle;
 	double sin_angle;
 	std::vector<double> x_c;	// x coordinates of unit circle CCW
@@ -162,7 +164,6 @@ int AvoidanceNode::handle_periodic_timer()
 	}
 	if (_avoid)
 	{
-		std::cout << "ResumeNav function" << std::endl;
 		ResumeNav();
 	}
 
@@ -250,6 +251,12 @@ int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
 	_vn = gps_info.vn() * 1e-3;
 	_ve = gps_info.ve() * 1e-3;
 	_vd = gps_info.vd() * 1e-3;
+	_target_wp_available = gps_info.has_target_wp();
+	if (_target_wp_available)
+	{
+		_target_wp = gps_info.target_wp();
+		std::cout << "target wp number: " << _target_wp << std::endl;
+	}
 	_gps_position_valid = true;
 	_time_gps = getTimeStamp();
 
@@ -491,7 +498,8 @@ int AvoidanceNode::ConstructSSD()
 			double e2 = (sinqdr - cosqdrtanalpha) * 2. * _SSD_c.vmax;
 			double n1 = (cosqdr - sinqdrtanalpha) * 2. * _SSD_c.vmax;
 			double n2 = (cosqdr + sinqdrtanalpha) * 2. * _SSD_c.vmax;
-			std::cout << "e1: " << e1 <<" e2: " << e2 << " n1: " << n1 << " n2: " << n2;
+
+			//std::cout << "e1: " << e1 << " e2: " << e2 << " n1: " << n1 << " n2: " << n2 << std::endl;
 
 			ClipperLib::Path VO_int;
 			VO_int << ClipperLib::IntPoint(Scale_to_clipper(ve_i), Scale_to_clipper(vn_i))
@@ -526,8 +534,22 @@ int AvoidanceNode::SSDResolution()
 		double d2;
 	};
 	std::vector<Vertex_data> vertices;
-	double ve_scaled = Scale_to_clipper(_ve);
-	double vn_scaled = Scale_to_clipper(_vn);
+	double vn_scaled;
+	double ve_scaled;
+	if (_avoidance_config.getAvoidToTarget() && _target_wp_available) // Avoid towards next waypoint as target heading
+	{
+		n_e_coordinate relative_wp = _avoidance_geometry.getRelWpNorthEast(_own_pos, _target_wp);
+		double rel_hdg = atan2(relative_wp.east, relative_wp.north);
+		std::cout << "rel_hdg: " << rel_hdg / M_PI * 180. << std::endl;
+		vn_scaled = Scale_to_clipper(_SSD_c.vset * cos(rel_hdg));
+		ve_scaled = Scale_to_clipper(_SSD_c.vset * sin(rel_hdg));
+	}
+	else // Avoid with current heading as target
+	{
+		vn_scaled = Scale_to_clipper(_vn);
+		ve_scaled = Scale_to_clipper(_ve);
+	}
+
 
 	// if no solution
 	if (_SSD_v.ARV_scaled.size() == 0)
@@ -560,7 +582,7 @@ int AvoidanceNode::SSDResolution()
 			double diff2 = pow(Ve_diff, 2.) + pow(Vn_diff, 2.);
 			double t_scalar = ((ve_scaled - Ve) * Ve_diff + (vn_scaled - Vn) * Vn_diff) / diff2;
 			double Ve_res = Ve + t_scalar * Ve_diff;
-			double Vn_res = Vn + t_scalar + Vn_diff;
+			double Vn_res = Vn + t_scalar * Vn_diff;
 			t_scalar = std::max(0., std::min(t_scalar, 1.)); // clip between 0. and 1.
 			vertex.p_e = Ve;
 			vertex.p_n = Vn;
@@ -570,18 +592,18 @@ int AvoidanceNode::SSDResolution()
 			vertex.t = t_scalar;
 			vertex.w_e = Ve_res;
 			vertex.w_n = Vn_res;
-			vertex.d2 = pow(Ve_res - ve_scaled, 2.) + pow(Vn_res - vn_scaled, 2.);
+			vertex.d2 = pow(Scale_from_clipper(Ve_res - ve_scaled), 2.) + pow(Scale_from_clipper(Vn_res - vn_scaled), 2.); // Note: Unscaled due to overflow errors !!!!!!
 			vertices.push_back(vertex);
 		}
 		// sort solutions
-		// sort by name:
+		// sort by d2:
 		std::sort(vertices.begin(), vertices.end(),
 		    [](Vertex_data const &a, Vertex_data const &b) {
 			return a.d2 < b.d2;
 		    });
 
 		_ve_sp = Scale_from_clipper(vertices[0].w_e);
-		_vn_sp = Scale_from_clipper(vertices[1].w_n);
+		_vn_sp = Scale_from_clipper(vertices[0].w_n);
 		_avoid = true;
 
 		// Calculate CPA for solution
@@ -593,14 +615,13 @@ int AvoidanceNode::SSDResolution()
 			double ve_res_rel = _ve_sp - intruder->getVe();
 			double v_res_rel2 = pow(vn_res_rel,2) + pow(ve_res_rel,2);
 			double t_cpa_res = - (intruder->getPnRel() * vn_res_rel + intruder->getPeRel() * ve_res_rel) / (v_res_rel2);
-			double d_cpa_res = sqrt(intruder->getD2Rel() - pow(t_cpa_res, 2) * v_res_rel2);
 			max_t_cpa_res = std::max(max_t_cpa_res, t_cpa_res);
 		}
-		double cpa_n = _vn_sp * max_t_cpa_res; // [m]
-		double cpa_e = _ve_sp * max_t_cpa_res; // [m]
+		n_e_coordinate cpa_ne;
+		cpa_ne.north = _vn_sp * max_t_cpa_res; // [m]
+		cpa_ne.east  = _ve_sp * max_t_cpa_res; // [m]
 
-		latdlond res_point;
-		calc_position_from_reference(_own_pos, res_point, cpa_n, cpa_e);
+		latdlond res_point = calc_latdlond_from_reference(_own_pos, cpa_ne);
 		_latd_sp = res_point.latd;
 		_lond_sp = res_point.lond;
 
@@ -679,7 +700,6 @@ int AvoidanceNode::ResumeNav()
 		_avoidance_pub.publish(avoidance_message);
 		std::cout << "Resuming Nav" << std::endl;
 	}
-
 	return 0;
 }
 

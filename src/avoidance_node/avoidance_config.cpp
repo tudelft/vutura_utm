@@ -15,7 +15,8 @@ Avoidance_config::Avoidance_config() :
 	    _v_min(AVOIDANCE_V_MIN),
 	    _v_max(AVOIDANCE_V_MAX),
 	    _v_set(AVOIDANCE_V_SET),
-	    _logging(AVOIDANCE_LOGGING)
+	    _logging(AVOIDANCE_LOGGING),
+	    _avoid_to_target(AVOIDANCE_AVOID_TO_TARGET)
 	    {
 
 	    }
@@ -36,6 +37,7 @@ int Avoidance_config::parse_config(std::string config_file)
 		_v_set = config["v_set"];
 		_logging = config["logging"];
 		_log_prefix = config["log_prefix"];
+		_avoid_to_target = config["avoid_to_target"];
 	} catch (...) {
 		std::cerr << "Failed to parse config file " << config_file << std::endl;
 		return -1;
@@ -92,4 +94,9 @@ bool Avoidance_config::getLogging()
 std::string Avoidance_config::getLogPrefix()
 {
 	return _log_prefix;
+}
+
+bool Avoidance_config::getAvoidToTarget()
+{
+	return _avoid_to_target;
 }

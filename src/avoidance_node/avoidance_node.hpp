@@ -65,6 +65,8 @@ private:
 	double _vn;
 	double _ve;
 	double _vd;
+	bool _target_wp_available;
+	uint32_t _target_wp;
 
 	bool _avoid;
 	double _vn_sp;

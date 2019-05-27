@@ -54,3 +54,19 @@ int Avoidance_geometry::parse_geometry(std::string geometry_file)
 	std::cout << geometry.dump(4) << std::endl;
 	return 0;
 }
+
+struct latdlond Avoidance_geometry::getWpCoordinatesLatLon(size_t wp_index)
+{
+	latdlond wp_coord;
+	wp_coord.latd = _flightplan.at(wp_index)[1];
+	wp_coord.lond = _flightplan.at(wp_index)[0];
+	return wp_coord;
+}
+
+struct n_e_coordinate Avoidance_geometry::getRelWpNorthEast(position_params &pos, size_t wp_index)
+{
+	latdlond wp_latdlond = getWpCoordinatesLatLon(wp_index);
+	n_e_coordinate rel_waypoint_ne = calc_northeast_from_reference(pos, wp_latdlond);
+
+	return rel_waypoint_ne;
+}

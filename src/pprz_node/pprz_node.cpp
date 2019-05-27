@@ -44,6 +44,7 @@ void PaparazziNode::pprz_callback(std::string packet)
 		msg.set_vn(_gpos_msg.Vn);
 		msg.set_ve(_gpos_msg.Ve);
 		msg.set_vd(_gpos_msg.Vd);
+		msg.set_target_wp(_gpos_msg.target_wp);
 		std::string gps_message = msg.SerializeAsString();
 		_position_publisher.publish(gps_message);
 	}
