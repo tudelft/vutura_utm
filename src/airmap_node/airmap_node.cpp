@@ -409,6 +409,16 @@ int AirmapNode::set_position(float latitude, float longitude, float alt_msl, flo
 			.add<std::uint16_t>(htons(messagePosition.size()))
 			.add(messagePosition);
 
+	airmap::telemetry::Speed speed;
+	speed.set_timestamp(getTimeStamp());
+	speed.set_velocity_x(10.0);
+	speed.set_velocity_y(10.0);
+	speed.set_velocity_z(10.0);
+	auto messageSpeed = speed.SerializeAsString();
+	_payload.add<std::uint16_t>(htons(static_cast<std::uint16_t>(Type::speed)))
+			.add<std::uint16_t>(htons(messageSpeed.size()))
+			.add(messageSpeed);
+
 	// encrypt payload
 	_crypto.encrypt(_commsKey, _payload, _cipher, _iv);
 

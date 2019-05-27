@@ -130,7 +130,7 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 			try {
 				if ((*it)["altitude"].get<std::string>() == "") {
 					// invalid
-					std::cout << "Invalid altitude" << std::endl;
+					std::cout << "Invalid altitude " << (*it)["id"].get<std::string>() << std::endl;
 					continue;
 				}
 				TrafficInfo tinfo;
@@ -155,6 +155,11 @@ class AirmapTrafficCallback : public virtual mqtt::callback,
 					tinfo.set_heading(std::stoul( heading ));
 				} else {
 					tinfo.set_heading(0);
+				}
+
+				std::string id = (*it)["id"].get<std::string>();
+				if (id.rfind("flight", 0) == 0) {
+					std::cout << (*it).dump(4) << std::endl;
 				}
 
 				std::string tinfo_data = tinfo.SerializeAsString();

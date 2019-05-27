@@ -47,9 +47,10 @@ public:
 		if (CURLE_OK != curl_get(url.c_str(), m_headers, res)) {
 			return -1;
 		}
-		std::cout << "request pilot id:" << std::endl << res << std::endl;
-		auto j = nlohmann::json::parse(res);
+		std::cout << "url: " << url << std::endl << "result: " << std::endl << res << std::endl;
 		try {
+			auto j = nlohmann::json::parse(res);
+			std::cout << j.dump(4) << std::endl;
 			pilotID = j["data"]["id"];
 		}
 		catch (...) {
@@ -76,8 +77,8 @@ public:
 			{"buffer", 20},
 			{"max_altitude_agl", 120},
 			{"takeoff_latitude", latitude},
-			{"takeoff_longitude", longitude},
-			{"rulesets", {"custom_z5d341_drone_rules"}}
+			{"takeoff_longitude", longitude}/*,
+			{"rulesets", {"custom_z5d341_drone_rules"}}*/
 		};
 
 		if (geometry == nullptr) {
@@ -110,6 +111,7 @@ public:
 	int get_flight_briefing(const std::string& flightplanID) {
 		std::string url = m_url + "/flight/v2/plan/" + flightplanID + "/briefing";
 		std::string res;
+		std::cout << url << std::endl;
 		if (CURLE_OK != curl_get(url.c_str(), m_headers, res)) {
 			return -1;
 		}

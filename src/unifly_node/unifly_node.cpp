@@ -110,6 +110,11 @@ int UniflyNode::login()
 
 	os.close();
 
+
+//	_takeoff = true;
+//	_operation_unique_identifier = "7dfaf9e8-6c46-4b14-8ac4-a30d78b31e1b";
+//	send_land();
+
 	request_flight();
 
 	get_validation_results();
