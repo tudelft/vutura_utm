@@ -523,6 +523,14 @@ int AvoidanceNode::SSDResolution()
 	c.AddPath(_SSD_c.v_c_set_in, ClipperLib::ptClip, true);
 	c.Execute(ClipperLib::ctIntersection, _SSD_v.ARV_scaled, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
 
+	// Clip geofences
+	for (std::pair<std::string, Avoidance_intruder*> intruder_pair : _intr_inconf)
+	{
+		Avoidance_intruder* intruder = intruder_pair.second;
+		c.AddPaths(ConstructGeofencePolygons(*intruder), ClipperLib::ptClip, true);
+	}
+	c.Execute(ClipperLib::ctDifference, _SSD_v.ARV_scaled, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
+
 	struct Vertex_data {
 		double p_e;
 		double p_n;
@@ -710,8 +718,93 @@ ClipperLib::Paths AvoidanceNode::ConstructGeofencePolygons(Avoidance_intruder &i
 
 		double a2		= K / K_2_parallel;
 		double b2		= K / K_2_perp;
-	}
 
+		size_t n_points		= _avoidance_config.getNAngle();
+
+		std::vector<double> v_res_n_basic;
+		std::vector<double> v_res_e_basic;
+
+		// If an ellipse:
+		if (b2 > 0.)
+		{
+			if (v_int_perp < 0.)
+			{
+				continue;
+			}
+			double a		= sqrt(a2);
+			double b		= sqrt(b2);
+			double a2_over_b2	= a2 / b2;
+
+			if (a2_over_b2 > 200.)
+			{
+				a2_over_b2 = 200.;
+			}
+
+			double angle		= -M_PI;
+			double angle_step	= 2. * M_PI / n_points;
+			std::vector<double> angles;
+			for (size_t i = 0; i < n_points; ++i)
+			{
+				double angle_converted = angle - sin(angle * 2.) * a2_over_b2 / 400.;
+				angles.push_back(angle_converted);
+				v_res_n_basic.push_back(a * sin(angle));
+				v_res_e_basic.push_back(b * cos(angle));
+				angle = angle + angle_step;
+			}
+
+		}
+		// if an hyperbola
+		else
+		{
+			double a		= sqrt(a2);
+			double b		= sqrt(-b2);
+			double x		= abs(c_parallel) + 2. * _avoidance_config.getVMax();
+			double angle_max	= log(x / a + sqrt(pow(x,2) / a2 - 1.));
+
+			if (phi >= 0.)
+			{
+				double angle = angle_max;
+				double angle_step = -2. * angle_max / n_points;
+				for (size_t i = 0; i < n_points; ++i)
+				{
+					v_res_n_basic.push_back(b * sinh(angle));
+					v_res_e_basic.push_back(a * cosh(angle));
+					angle = angle + angle_step;
+				}
+			}
+			else
+			{
+				double angle = -angle_max;
+				double angle_step = 2. * angle_max / n_points;
+				for (size_t i = 0; i < n_points; ++i)
+				{
+					v_res_n_basic.push_back(b * sinh(angle));
+					v_res_e_basic.push_back(-a * cosh(angle));
+					angle = angle + angle_step;
+				}
+			}
+		}
+
+		ClipperLib::Path geofence_polygon;
+
+		double cos_rot_phi = cos(phi + rotation_geo);
+		double sin_rot_phi = sin(phi + rotation_geo);
+
+		double c_n = c_perp * cos_rot_phi + c_parallel * sin_rot_phi + v_int_parallel * sin(rotation_geo);
+		double c_e = c_parallel * cos_rot_phi - c_perp * sin_rot_phi + v_int_parallel * cos(rotation_geo);
+
+		for (size_t i = 0; i < n_points; ++i)
+		{
+			double v_res_n_rotated = v_res_n_basic.at(i) * cos_rot_phi + v_res_e_basic.at(i) * sin_rot_phi;
+			double v_res_e_rotated = v_res_e_basic.at(i) + cos_rot_phi - v_res_n_basic.at(i) * sin_rot_phi;
+			double v_res_n = v_res_n_rotated + c_n;
+			double v_res_e = v_res_e_rotated + c_e;
+
+			geofence_polygon << ClipperLib::IntPoint(Scale_to_clipper(v_res_e), Scale_to_clipper(v_res_n));
+		}
+
+		geofence_polygons.push_back(geofence_polygon);
+	}
 	return geofence_polygons;
 }
 
