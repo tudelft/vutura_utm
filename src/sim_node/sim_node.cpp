@@ -155,8 +155,8 @@ int SimNode::handle_periodic_timer()
 	gps_message.set_timestamp(0);
 	gps_message.set_lat(new_position.latd*1e7);
 	gps_message.set_lon(new_position.lond*1e7);
-	gps_message.set_alt_msl(10000);
-	gps_message.set_alt_agl(10000);
+	gps_message.set_alt_msl(45000);
+	gps_message.set_alt_agl(45000);
 
 	std::string message_string = gps_message.SerializeAsString();
 
