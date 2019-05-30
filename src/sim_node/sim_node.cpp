@@ -108,7 +108,7 @@ SimNode::~SimNode()
 
 void SimNode::init()
 {
-	update_position_params(_pos, 52.1667145, 4.4137890, 45.0);
+	update_position_params(_pos, 52.1693774, 4.4121613, 45.0);
 
 	_periodic_timer.set_timeout_callback(std::bind(&SimNode::handle_periodic_timer, this));
 	_periodic_timer.start_periodic(500);
@@ -131,8 +131,8 @@ int SimNode::handle_periodic_timer()
 	float lat = lat_0 + 0.002 * std::sin(_angle);
 
 	// Fly straight line
-	latdlond start_position = {52.1667145, 4.4137890};
-	latdlond end_position = {52.1693286, 4.4202973};
+	latdlond start_position = {52.1693774, 4.4121613};
+	latdlond end_position = {52.1638250, 4.4160479};
 	// calculate delta x,y
 	double x, y;
 	get_relative_coordinates(start_position.latd, start_position.lond, end_position.latd, end_position.lond, &x, &y);
