@@ -8,6 +8,30 @@
 #include "nng_event_loop/publisher.hpp"
 #include "nng_event_loop/timer.hpp"
 
+struct position_params
+{
+    double latd;
+    double lat;
+    double lond;
+    double lon;
+    double alt;
+    double coslat;
+    double sinlat;
+    double r;
+};
+
+struct latdlond
+{
+	double latd;
+	double lond;
+};
+
+struct n_e_coordinate
+{
+	double north;
+	double east;
+};
+
 class SimNode : public EventLoop {
 public:
 	SimNode(int instance);
@@ -20,8 +44,7 @@ private:
 	Timer _periodic_timer;
 	Publisher _gps_pub;
 
-	int _lat;
-	int _lon;
+	position_params _pos;
 	float _angle;
 
 };
