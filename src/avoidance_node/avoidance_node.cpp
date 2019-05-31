@@ -407,16 +407,9 @@ void AvoidanceNode::statebased_CD(Avoidance_intruder& intruder)
 {
 	double rpz;
 	double rpz2;
-	if (_avoid)
-	{
-		rpz = _avoidance_config.getRPZ() * _avoidance_config.getRPZMar() * _avoidance_config.getRPZMarDetect();
-		rpz2 = pow(rpz,2);
-	}
-	else
-	{
-		rpz = _avoidance_config.getRPZ() * _avoidance_config.getRPZMarDetect();
-		rpz2 = pow(rpz,2);
-	}
+
+	rpz = _avoidance_config.getRPZ() * _avoidance_config.getRPZMarDetect();
+	rpz2 = pow(rpz,2);
 
 	const std::string ac_id = intruder.getAircraftId();
 
@@ -609,9 +602,9 @@ int AvoidanceNode::SSDResolution()
 			double Vn_diff = Vn_next - Vn;
 			double diff2 = pow(Ve_diff, 2.) + pow(Vn_diff, 2.);
 			double t_scalar = ((ve - Ve) * Ve_diff + (vn - Vn) * Vn_diff) / diff2;
+			t_scalar = std::max(0., std::min(t_scalar, 1.)); // clip between 0. and 1.
 			double Ve_res = Ve + t_scalar * Ve_diff;
 			double Vn_res = Vn + t_scalar * Vn_diff;
-			t_scalar = std::max(0., std::min(t_scalar, 1.)); // clip between 0. and 1.
 			vertex.p_e = Ve;
 			vertex.p_n = Vn;
 			vertex.q_e = Ve_diff;
@@ -648,9 +641,6 @@ int AvoidanceNode::SSDResolution()
 		n_e_coordinate cpa_ne;
 		cpa_ne.north = _vn_sp * max_t_cpa_res; // [m]
 		cpa_ne.east  = _ve_sp * max_t_cpa_res; // [m]
-
-		std::cout << "hdg to be changed: " << (atan2(_ve_sp, _vn_sp) - atan2(_ve, _vn)) / M_PI * 180. << std::endl;
-		//std::cout  << "coordinate x: " << cpa_ne.east << " \tcoordinate y: " << cpa_ne.north << std::endl;
 
 		latdlond res_point = calc_latdlond_from_reference(_own_pos, cpa_ne);
 		std::vector<std::vector<double>> soft_geofence = _avoidance_geometry.getSoftGeofenceLatdLond();
