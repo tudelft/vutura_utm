@@ -2,6 +2,7 @@
 #define AVOIDANCE_GEO_TOOLS_H
 
 #include <array>
+#include "clipper/clipper.hpp"
 
 struct position_params
 {
@@ -42,5 +43,12 @@ latdlond calc_latdlond_from_reference(position_params& reference_pos, n_e_coordi
 n_e_coordinate calc_northeast_from_reference(position_params& reference_pos, latdlond& target_latdlond);
 geofence_sector calc_geofence_sector_from_n_e(std::array<n_e_coordinate,2>& n_e);
 double calc_distance_from_reference_and_target_latdlond(position_params& reference_pos, latdlond& target_latdlond);
+
+// clipper tools
+signed long long Scale_to_clipper(double coord);
+double Scale_from_clipper(double coord);
+
+// area check using clipper
+bool latdlond_inside_geofence(position_params& reference_pos, std::vector<std::vector<double>>& geofence_ll, latdlond& target_latdlond);
 
 #endif // AVOIDANCE_GEO_TOOLS_H

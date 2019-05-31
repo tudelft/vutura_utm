@@ -8,8 +8,6 @@
 
 #include "vutura_common.pb.h"
 
-#include "clipper/clipper.hpp"
-
 #include "nng_event_loop/event_loop.hpp"
 #include "nng_event_loop/timer.hpp"
 #include "nng_event_loop/subscriber.hpp"
@@ -90,8 +88,6 @@ private:
 	std::map<std::string, Avoidance_intruder*> _intr_avoid; // points to intruders for which a avoidance maneuvre is in progress
 
 	//SSD variables and functions
-	signed long long Scale_to_clipper(double coord);
-	double Scale_from_clipper(double coord);
 	int ConstructSSD();
 	ClipperLib::Paths ConstructGeofencePolygons(Avoidance_intruder& intruder);
 	int SSDResolution();

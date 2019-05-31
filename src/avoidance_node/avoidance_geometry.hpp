@@ -12,10 +12,12 @@ public:
 	struct latdlond getWpCoordinatesLatLon(size_t wp_index);
 	struct n_e_coordinate getRelWpNorthEast(position_params& pos, size_t wp_index);
 	std::vector<std::vector<double>> getGeofenceLatdLond();
+	std::vector<std::vector<double>> getSoftGeofenceLatdLond();
 
 private:
 	std::vector<std::vector<double>> _geofence;
 	std::vector<std::vector<double>> _flightplan;
+	std::vector<std::vector<double>> _soft_geofence;
 
 	double _airspeed;
 	double _altitude;

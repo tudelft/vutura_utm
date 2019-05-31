@@ -1,4 +1,5 @@
 #include <cmath>
+#include <iostream>
 #include "avoidance_geo_tools.h"
 
 void update_position_params(position_params& pos, double latd, double lond, double alt)
@@ -97,4 +98,37 @@ double calc_distance_from_reference_and_target_latdlond(position_params& referen
 	n_e_coordinate target_ne = calc_northeast_from_reference(reference_pos, target_latdlond);
 	double distance = sqrt(pow(target_ne.east,2) + pow(target_ne.north,2));
 	return distance;
+}
+
+signed long long Scale_to_clipper(double coord)
+{
+	signed long long clipper_coord = static_cast<signed long long>(coord * pow(2., 31));
+	return clipper_coord;
+}
+
+double Scale_from_clipper(double coord)
+{
+	double double_coord = static_cast<double>(coord * pow(2., -31));
+	return double_coord;
+}
+
+bool latdlond_inside_geofence(position_params &reference_pos, std::vector<std::vector<double>>& geofence_ll, latdlond& target_latdlond)
+{
+	ClipperLib::Clipper c;
+	ClipperLib::Path geofence;
+	for (size_t i = 0; i < geofence_ll.size(); ++i)
+	{
+		latdlond geofence_point_latdlond;
+		geofence_point_latdlond.latd = geofence_ll.at(i).at(1);
+		geofence_point_latdlond.lond = geofence_ll.at(i).at(0);
+		n_e_coordinate geofence_point_ne = calc_northeast_from_reference(reference_pos, geofence_point_latdlond);
+
+		geofence << ClipperLib::IntPoint(Scale_to_clipper(geofence_point_ne.east), Scale_to_clipper(geofence_point_ne.north));
+	}
+	n_e_coordinate target_point_ne = calc_northeast_from_reference(reference_pos, target_latdlond);
+	ClipperLib::IntPoint target_point_clipper;
+	target_point_clipper.X = Scale_to_clipper(target_point_ne.east);
+	target_point_clipper.Y = Scale_to_clipper(target_point_ne.north);
+
+	return ClipperLib::PointInPolygon(target_point_clipper, geofence);
 }

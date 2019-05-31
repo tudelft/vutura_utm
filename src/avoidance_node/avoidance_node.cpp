@@ -189,7 +189,6 @@ int AvoidanceNode::handle_periodic_timer()
 		write_log();
 	}
 
-
 	return 0;
 }
 
@@ -467,18 +466,6 @@ void AvoidanceNode::statebased_CD(Avoidance_intruder& intruder)
 	}
 }
 
-signed long long AvoidanceNode::Scale_to_clipper(double coord)
-{
-	signed long long clipper_coord = static_cast<signed long long>(coord * pow(2., 31));
-	return clipper_coord;
-}
-
-double AvoidanceNode::Scale_from_clipper(double coord)
-{
-	double double_coord = static_cast<double>(coord * pow(2., -31));
-	return double_coord;
-}
-
 int AvoidanceNode::ConstructSSD()
 {
 	size_t ntraf = _intruders.size();
@@ -662,12 +649,18 @@ int AvoidanceNode::SSDResolution()
 		cpa_ne.north = _vn_sp * max_t_cpa_res; // [m]
 		cpa_ne.east  = _ve_sp * max_t_cpa_res; // [m]
 
-		std::cout << "hdg to be changes: " << (atan2(_ve_sp, _vn_sp) - atan2(_ve, _vn)) / M_PI * 180. << std::endl;
+		std::cout << "hdg to be changed: " << (atan2(_ve_sp, _vn_sp) - atan2(_ve, _vn)) / M_PI * 180. << std::endl;
 		//std::cout  << "coordinate x: " << cpa_ne.east << " \tcoordinate y: " << cpa_ne.north << std::endl;
 
 		latdlond res_point = calc_latdlond_from_reference(_own_pos, cpa_ne);
-		_latd_sp = res_point.latd;
-		_lond_sp = res_point.lond;
+		std::vector<std::vector<double>> soft_geofence = _avoidance_geometry.getSoftGeofenceLatdLond();
+		bool res_point_in_geofence = latdlond_inside_geofence(_own_pos, soft_geofence, res_point);
+
+		if (res_point_in_geofence)
+		{
+			_latd_sp = res_point.latd;
+			_lond_sp = res_point.lond;
+		}
 
 		// Generate avoidance message
 		AvoidanceVelocity Avoidance_msg;
@@ -693,7 +686,7 @@ ClipperLib::Paths AvoidanceNode::ConstructGeofencePolygons(Avoidance_intruder &i
 	double v_int_n		= intruder.getVn();
 	double v_int_e		= intruder.getVe();
 
-	std::vector<std::vector<double>> geofence_ll = _avoidance_geometry.getGeofenceLatdLond();
+	std::vector<std::vector<double>> geofence_ll = _avoidance_geometry.getSoftGeofenceLatdLond();
 	std::vector<n_e_coordinate> geofence_ne;
 
 	for (size_t i = 0; i < geofence_ll.size(); i++)

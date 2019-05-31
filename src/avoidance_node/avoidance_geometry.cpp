@@ -9,6 +9,7 @@
 Avoidance_geometry::Avoidance_geometry() :
 	_geofence(),
 	_flightplan(),
+	_soft_geofence(),
 	_airspeed(0),
 	_altitude(0)
 {
@@ -28,6 +29,7 @@ int Avoidance_geometry::parse_geometry(std::string geometry_file)
 				if (feature["properties"]["name"] == "geofence")
 				{
 					std::vector<std::vector<double>> geofence = feature["geometry"]["coordinates"][0];
+					geofence.pop_back();
 					_geofence = geofence;
 				}
 				if (feature["properties"]["name"] == "flightplan")
@@ -41,6 +43,12 @@ int Avoidance_geometry::parse_geometry(std::string geometry_file)
 						std::cerr << "No airspeed or altitude defined in flighplan section of geometry file" << std::endl;
 						return -1;
 					}
+				}
+				if (feature["properties"]["name"] == "soft_geofence")
+				{
+					std::vector<std::vector<double>> soft_geofence = feature["geometry"]["coordinates"][0];
+					soft_geofence.pop_back();
+					_soft_geofence = soft_geofence;
 				}
 			} catch (...) {
 				std::cerr << "Invalid geometry feature imported from geojson (name not specified)" << std::endl;
@@ -74,4 +82,9 @@ struct n_e_coordinate Avoidance_geometry::getRelWpNorthEast(position_params &pos
 std::vector<std::vector<double>> Avoidance_geometry::getGeofenceLatdLond()
 {
 	return _geofence;
+}
+
+std::vector<std::vector<double>> Avoidance_geometry::getSoftGeofenceLatdLond()
+{
+	return _soft_geofence;
 }
