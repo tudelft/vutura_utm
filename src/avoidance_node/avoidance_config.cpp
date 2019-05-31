@@ -11,6 +11,7 @@ Avoidance_config::Avoidance_config() :
 	    _t_pop_traffic(AVOIDANCE_T_POP_TRAFFIC),
 	    _r_pz(AVOIDANCE_RPZ),
 	    _r_pz_mar(AVOIDANCE_RPZ_MAR),
+	    _r_pz_mar_detect(AVOIDANCE_RPZ_MAR_DETECT),
 	    _n_angle(AVOIDANCE_N_ANGLE),
 	    _v_min(AVOIDANCE_V_MIN),
 	    _v_max(AVOIDANCE_V_MAX),
@@ -31,6 +32,7 @@ int Avoidance_config::parse_config(std::string config_file)
 		_t_pop_traffic = config["t_pop_traffic"];
 		_r_pz = config["r_pz"];
 		_r_pz_mar = config["r_pz_mar"];
+		_r_pz_mar_detect = config["r_pz_mar_detect"];
 		_n_angle = config["n_angle"];
 		_v_min = config["v_min"];
 		_v_max = config["v_max"];
@@ -64,6 +66,11 @@ double Avoidance_config::getRPZ()
 double Avoidance_config::getRPZMar()
 {
 	return _r_pz_mar;
+}
+
+double Avoidance_config::getRPZMarDetect()
+{
+	return _r_pz_mar_detect;
 }
 
 unsigned Avoidance_config::getNAngle()

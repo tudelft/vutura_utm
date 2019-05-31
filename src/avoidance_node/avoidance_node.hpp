@@ -69,6 +69,7 @@ private:
 	uint32_t _target_wp;
 
 	bool _avoid;
+	bool _in_pz;
 	double _vn_sp;
 	double _ve_sp;
 	double _vd_sp;
@@ -111,5 +112,7 @@ private:
 	struct SSD_var
 	{
 		ClipperLib::Paths ARV_scaled;
+		ClipperLib::Paths ARV_scaled_speed;
+		ClipperLib::Paths ARV_scaled_geofence;
 	} _SSD_v;
 };

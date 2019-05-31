@@ -31,6 +31,7 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_target_wp_available(0),
 	_target_wp(0),
 	_avoid(false),
+	_in_pz(false),
 	_vn_sp(0),
 	_ve_sp(0),
 	_vd_sp(0),
@@ -51,6 +52,7 @@ void AvoidanceNode::init()
 	_periodic_timer.start_periodic(200);
 
 	_traffic_sub.set_receive_callback(std::bind(&AvoidanceNode::traffic_callback, this, _1));
+	//_traffic_sub.subscribe(socket_name(SOCK_PUBSUB_TRAFFIC_INFO, _instance));
 	_traffic_sub.subscribe(SOCK_PUBSUB_TRAFFIC_INFO);
 
 	_gps_sub.set_receive_callback(std::bind(&AvoidanceNode::gps_position_callback, this, _1));
@@ -160,6 +162,7 @@ int AvoidanceNode::handle_periodic_timer()
 	}
 	if (_intr_inconf.size() > 0)
 	{
+		_in_pz = false;
 		ConstructSSD();
 		SSDResolution();
 	}
@@ -185,13 +188,12 @@ void AvoidanceNode::traffic_callback(std::string message)
 	if (success) {
 		handle_traffic(traffic_info);
 	}
-
 }
 
 int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
 {
 	std::string aircraft_id_i = traffic.aircraft_id();
-	if (aircraft_id_i.find("flight|"))
+	if (aircraft_id_i.find("flight|") == std::string::npos)
 	{
 		return 0;
 	}
@@ -256,7 +258,6 @@ int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
 	if (_target_wp_available)
 	{
 		_target_wp = gps_info.target_wp();
-		std::cout << "target wp number: " << _target_wp << std::endl;
 	}
 	_gps_position_valid = true;
 	_time_gps = getTimeStamp();
@@ -393,8 +394,19 @@ void AvoidanceNode::traffic_housekeeping(double t_pop_traffic)
 
 void AvoidanceNode::statebased_CD(Avoidance_intruder& intruder)
 {
-	const double rpz = _avoidance_config.getRPZ();
-	const double rpz2 = pow(rpz, 2);
+	double rpz;
+	double rpz2;
+	if (_avoid)
+	{
+		rpz = _avoidance_config.getRPZ() * _avoidance_config.getRPZMar() * _avoidance_config.getRPZMarDetect();
+		rpz2 = pow(rpz,2);
+	}
+	else
+	{
+		rpz = _avoidance_config.getRPZ() * _avoidance_config.getRPZMarDetect();
+		rpz2 = pow(rpz,2);
+	}
+
 	const double t_lookahead = _avoidance_config.getTLookahead();
 	const std::string ac_id = intruder.getAircraftId();
 
@@ -475,14 +487,20 @@ int AvoidanceNode::ConstructSSD()
 			double ve_i = intruder.getVe();
 			double qdr = intruder.getBearingRel();
 			double dist = intruder.getDRel();
+			double hsep = _avoidance_config.getRPZ();
+			double hsepm = _SSD_c.hsepm;
 
 			// In LOS the VO can't be defined, place the distance on the edge
-			if (dist < _SSD_c.hsepm)
+			if (dist < hsep)
 			{
-				dist = _SSD_c.hsepm;
+				_in_pz = true;
+			}
+			if (dist < hsepm)
+			{
+				dist = hsepm;
 			}
 
-			double alpha = asin(_SSD_c.hsepm / dist);
+			double alpha = asin(hsepm / dist);
 			if (alpha > _SSD_c.alpham)
 			{
 				alpha = _SSD_c.alpham;
@@ -510,6 +528,7 @@ int AvoidanceNode::ConstructSSD()
 			c.AddPath(VO_i_paths.at(VO_i_paths.size() - 1), ClipperLib::ptClip, true);
 		}
 	}
+	_SSD_v.ARV_scaled.clear();
 	c.Execute(ClipperLib::ctDifference, _SSD_v.ARV_scaled, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
 	return 0;
 }
@@ -517,11 +536,13 @@ int AvoidanceNode::ConstructSSD()
 int AvoidanceNode::SSDResolution()
 {
 	// Assuming constant speed (for now) !!!!!!!
+
 	ClipperLib::Clipper c;
 	c.AddPaths(_SSD_v.ARV_scaled, ClipperLib::ptSubject, true);
 	c.AddPath(_SSD_c.v_c_set_out, ClipperLib::ptClip, true);
 	c.AddPath(_SSD_c.v_c_set_in, ClipperLib::ptClip, true);
-	c.Execute(ClipperLib::ctIntersection, _SSD_v.ARV_scaled, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
+	_SSD_v.ARV_scaled_speed.clear();
+	c.Execute(ClipperLib::ctIntersection, _SSD_v.ARV_scaled_speed, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
 
 	// Clip geofences
 	for (std::pair<std::string, Avoidance_intruder*> intruder_pair : _intr_inconf)
@@ -529,7 +550,8 @@ int AvoidanceNode::SSDResolution()
 		Avoidance_intruder* intruder = intruder_pair.second;
 		c.AddPaths(ConstructGeofencePolygons(*intruder), ClipperLib::ptClip, true);
 	}
-	c.Execute(ClipperLib::ctDifference, _SSD_v.ARV_scaled, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
+	_SSD_v.ARV_scaled_geofence.clear();
+	c.Execute(ClipperLib::ctDifference, _SSD_v.ARV_scaled_geofence, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
 
 	struct Vertex_data {
 		double p_e;
@@ -543,19 +565,19 @@ int AvoidanceNode::SSDResolution()
 		double d2;
 	};
 	std::vector<Vertex_data> vertices;
-	double vn_scaled;
-	double ve_scaled;
+	double vn;
+	double ve;
 	if (_avoidance_config.getAvoidToTarget() && _target_wp_available) // Avoid towards next waypoint as target heading
 	{
 		n_e_coordinate relative_wp = _avoidance_geometry.getRelWpNorthEast(_own_pos, _target_wp);
 		double rel_hdg = atan2(relative_wp.east, relative_wp.north);
-		vn_scaled = Scale_to_clipper(_SSD_c.vset * cos(rel_hdg));
-		ve_scaled = Scale_to_clipper(_SSD_c.vset * sin(rel_hdg));
+		vn = _SSD_c.vset * cos(rel_hdg);
+		ve = _SSD_c.vset * sin(rel_hdg);
 	}
 	else // Avoid with current heading as target
 	{
-		vn_scaled = Scale_to_clipper(_vn);
-		ve_scaled = Scale_to_clipper(_ve);
+		vn = _vn;
+		ve = _ve;
 	}
 
 
@@ -566,7 +588,7 @@ int AvoidanceNode::SSDResolution()
 		return -1;
 	}
 
-	for (ClipperLib::Path path : _SSD_v.ARV_scaled)
+	for (ClipperLib::Path path : _SSD_v.ARV_scaled_speed)
 	{
 
 		for (unsigned i = 0; i < path.size(); ++i)
@@ -581,14 +603,14 @@ int AvoidanceNode::SSDResolution()
 				point_next = path.at(0);
 			}
 			Vertex_data vertex;
-			double Ve = point.X;
-			double Vn = point.Y;
-			double Ve_next = point_next.X;
-			double Vn_next = point_next.Y;
+			double Ve = Scale_from_clipper(point.X);
+			double Vn = Scale_from_clipper(point.Y);
+			double Ve_next = Scale_from_clipper(point_next.X);
+			double Vn_next = Scale_from_clipper(point_next.Y);
 			double Ve_diff = Ve_next - Ve;
 			double Vn_diff = Vn_next - Vn;
 			double diff2 = pow(Ve_diff, 2.) + pow(Vn_diff, 2.);
-			double t_scalar = ((ve_scaled - Ve) * Ve_diff + (vn_scaled - Vn) * Vn_diff) / diff2;
+			double t_scalar = ((ve - Ve) * Ve_diff + (vn - Vn) * Vn_diff) / diff2;
 			double Ve_res = Ve + t_scalar * Ve_diff;
 			double Vn_res = Vn + t_scalar * Vn_diff;
 			t_scalar = std::max(0., std::min(t_scalar, 1.)); // clip between 0. and 1.
@@ -600,7 +622,7 @@ int AvoidanceNode::SSDResolution()
 			vertex.t = t_scalar;
 			vertex.w_e = Ve_res;
 			vertex.w_n = Vn_res;
-			vertex.d2 = pow(Scale_from_clipper(Ve_res - ve_scaled), 2.) + pow(Scale_from_clipper(Vn_res - vn_scaled), 2.); // Note: Unscaled due to overflow errors !!!!!!
+			vertex.d2 = pow(Ve_res - ve, 2.) + pow(Vn_res - vn, 2.);
 			vertices.push_back(vertex);
 		}
 		// sort solutions
@@ -610,8 +632,8 @@ int AvoidanceNode::SSDResolution()
 			return a.d2 < b.d2;
 		    });
 
-		_ve_sp = Scale_from_clipper(vertices[0].w_e);
-		_vn_sp = Scale_from_clipper(vertices[0].w_n);
+		_ve_sp = vertices[0].w_e;
+		_vn_sp = vertices[0].w_n;
 		_avoid = true;
 
 		// Calculate CPA for solution
@@ -628,6 +650,9 @@ int AvoidanceNode::SSDResolution()
 		n_e_coordinate cpa_ne;
 		cpa_ne.north = _vn_sp * max_t_cpa_res; // [m]
 		cpa_ne.east  = _ve_sp * max_t_cpa_res; // [m]
+
+		std::cout << "hdg to be changes: " << (atan2(_ve_sp, _vn_sp) - atan2(_ve, _vn)) / M_PI * 180. << std::endl;
+		//std::cout  << "coordinate x: " << cpa_ne.east << " \tcoordinate y: " << cpa_ne.north << std::endl;
 
 		latdlond res_point = calc_latdlond_from_reference(_own_pos, cpa_ne);
 		_latd_sp = res_point.latd;
