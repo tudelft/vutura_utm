@@ -535,14 +535,16 @@ int AvoidanceNode::SSDResolution()
 	_SSD_v.ARV_scaled_speed.clear();
 	c.Execute(ClipperLib::ctIntersection, _SSD_v.ARV_scaled_speed, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
 
+	ClipperLib::Clipper c_geo;
 	// Clip geofences
 	for (std::pair<std::string, Avoidance_intruder*> intruder_pair : _intr_inconf)
 	{
 		Avoidance_intruder* intruder = intruder_pair.second;
-		c.AddPaths(ConstructGeofencePolygons(*intruder), ClipperLib::ptClip, true);
+		c_geo.AddPaths(_SSD_v.ARV_scaled_speed, ClipperLib::ptSubject, true);
+		c_geo.AddPaths(ConstructGeofencePolygons(*intruder), ClipperLib::ptClip, true);
 	}
 	_SSD_v.ARV_scaled_geofence.clear();
-	c.Execute(ClipperLib::ctDifference, _SSD_v.ARV_scaled_geofence, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
+	c_geo.Execute(ClipperLib::ctDifference, _SSD_v.ARV_scaled_geofence, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
 
 	struct Vertex_data {
 		double p_e;
@@ -579,7 +581,7 @@ int AvoidanceNode::SSDResolution()
 		return -1;
 	}
 
-	for (ClipperLib::Path path : _SSD_v.ARV_scaled_speed)
+	for (ClipperLib::Path path : _SSD_v.ARV_scaled_geofence)
 	{
 
 		for (unsigned i = 0; i < path.size(); ++i)
