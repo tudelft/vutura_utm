@@ -30,6 +30,8 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_vd(0),
 	_target_wp_available(0),
 	_target_wp(0),
+	_time_to_target(0),
+	_t_lookahead(0),
 	_avoid(false),
 	_in_pz(false),
 	_vn_sp(0),
@@ -156,6 +158,16 @@ int AvoidanceNode::handle_periodic_timer()
 
 	// perform traffic housekeeping
 	traffic_housekeeping(_avoidance_config.getTPopTraffic());
+	// update time to target and lookaheadtime
+	_t_lookahead = _avoidance_config.getTLookahead();
+	if (_target_wp_available)
+	{
+		latdlond target_latdlond = _avoidance_geometry.getWpCoordinatesLatLon(_target_wp);
+		double distance_to_target = calc_distance_from_reference_and_target_latdlond(_own_pos, target_latdlond);
+		double speed = sqrt(pow(_ve,2) + pow(_vn,2));
+		double time_to_target = distance_to_target / speed;
+		_t_lookahead = std::min(time_to_target, _t_lookahead);
+	}
 	for (Avoidance_intruder intruder : _intruders)
 	{
 		statebased_CD(intruder);
@@ -407,7 +419,6 @@ void AvoidanceNode::statebased_CD(Avoidance_intruder& intruder)
 		rpz2 = pow(rpz,2);
 	}
 
-	const double t_lookahead = _avoidance_config.getTLookahead();
 	const std::string ac_id = intruder.getAircraftId();
 
 	// Relative variables
@@ -436,7 +447,7 @@ void AvoidanceNode::statebased_CD(Avoidance_intruder& intruder)
 		t_los = t_cpa - dt_in;
 		t_out = t_cpa + dt_in;
 	}
-	bool inconf = (d_cpa < rpz) && (t_los < t_lookahead) && (t_out > 0);
+	bool inconf = (d_cpa < rpz) && (t_los < _t_lookahead) && (t_out > 0);
 	intruder.setConflictPar(inconf, t_cpa, d_cpa, d_in, d_los, t_los);
 
 	if (inconf)
@@ -444,7 +455,7 @@ void AvoidanceNode::statebased_CD(Avoidance_intruder& intruder)
 		// add/overwrite intruder to avoid and inconf map
 		_intr_inconf[ac_id] = &intruder;
 		_intr_avoid[ac_id] = &intruder;
-		std::cout << "In Conflict with: " << ac_id << " in " << t_los << " seconds" << " \t d_cpa: " << d_cpa << std::endl;
+		//std::cout << "In Conflict with: " << ac_id << " in " << t_los << " seconds" << " \t d_cpa: " << d_cpa << std::endl;
 	}
 	else {
 		if ( _intr_inconf.find(ac_id) == _intr_inconf.end() ) {

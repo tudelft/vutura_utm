@@ -91,3 +91,10 @@ geofence_sector calc_geofence_sector_from_n_e(std::array<n_e_coordinate,2>& n_e)
 	geofence_s.rotation		= atan2(geofence_s.distv.north, geofence_s.distv.east) - 0.5 * M_PI;
 	return geofence_s;
 }
+
+double calc_distance_from_reference_and_target_latdlond(position_params& reference_pos, latdlond& target_latdlond)
+{
+	n_e_coordinate target_ne = calc_northeast_from_reference(reference_pos, target_latdlond);
+	double distance = sqrt(pow(target_ne.east,2) + pow(target_ne.north,2));
+	return distance;
+}
