@@ -10,6 +10,8 @@ message GPSMessage {
   optional sint32 ve = 7; // [mm/s]
   optional sint32 vd = 8; // [mm/s]
   optional uint32 target_wp = 9; // index of active wp
+  optional sint32 wind_north = 10; //[mm/s]
+  optional sint32 wind_east = 11; //[mm/s]
 }
 
 message TrafficInfo {

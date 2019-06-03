@@ -30,6 +30,8 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_vd(0),
 	_target_wp_available(0),
 	_target_wp(0),
+	_wind_north(0),
+	_wind_east(0),
 	_time_to_target(0),
 	_t_lookahead(0),
 	_avoid(false),
@@ -269,6 +271,22 @@ int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
 	if (_target_wp_available)
 	{
 		_target_wp = gps_info.target_wp();
+	}
+	if (gps_info.has_wind_north())
+	{
+		_wind_north = gps_info.wind_north() * 1e-3;
+	}
+	else
+	{
+		_wind_north = 0.;
+	}
+	if (gps_info.has_wind_east())
+	{
+		_wind_east = gps_info.wind_east() * 1e-3;
+	}
+	else
+	{
+		_wind_east = 0.;
 	}
 	_gps_position_valid = true;
 	_time_gps = getTimeStamp();
