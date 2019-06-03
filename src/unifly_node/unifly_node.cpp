@@ -151,7 +151,7 @@ int UniflyNode::request_flight()
 
 	time_t current_time;
 	time(&current_time);
-	current_time -= 3600*2;
+	current_time;
 	char now[21];
 	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
@@ -365,7 +365,7 @@ int UniflyNode::request_permission(std::string uuid)
 
 	time_t current_time;
 	time(&current_time);
-	current_time -= 3600*2;
+	current_time;
 	char now[21];
 	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
@@ -451,7 +451,7 @@ int UniflyNode::send_tracking_position()
 
 	time_t current_time;
 	time(&current_time);
-	current_time -= 3600*2;
+	current_time;
 	char now[21];
 	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
@@ -502,7 +502,7 @@ int UniflyNode::send_takeoff()
 
 	time_t current_time;
 	time(&current_time);
-	current_time -= 3600*2;
+	current_time;
 	char now[21];
 	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
@@ -552,7 +552,7 @@ int UniflyNode::send_land()
 
 	time_t current_time;
 	time(&current_time);
-	current_time -= 3600*2;
+	current_time;
 	char now[21];
 	strftime(now, 21, "%FT%TZ", gmtime(&current_time));
 
