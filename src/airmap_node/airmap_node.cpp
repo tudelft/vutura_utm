@@ -64,6 +64,13 @@ void AirmapNode::init()
 
 	_uav_hb.set_receive_callback(std::bind(&AirmapNode::handle_uav_hb, this, _1));
 	_uav_hb.subscribe(socket_name(SOCK_PUBSUB_UAV_STATUS, _instance));
+
+	// get rulesets
+	if(0) {
+		nlohmann::json ruleset_request;
+		ruleset_request["geometry"] = _geometry;
+		_communicator.get_rulesets(ruleset_request.dump());
+	}
 }
 
 void AirmapNode::handle_utm_sp(std::string request, std::string &reply)

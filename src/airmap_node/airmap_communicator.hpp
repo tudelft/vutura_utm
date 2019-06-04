@@ -77,8 +77,8 @@ public:
 			{"buffer", 20},
 			{"max_altitude_agl", 120},
 			{"takeoff_latitude", latitude},
-			{"takeoff_longitude", longitude}/*,
-			{"rulesets", {"custom_z5d341_drone_rules"}}*/
+			{"takeoff_longitude", longitude},
+			{"rulesets", {"custom_lggwgxy8nwrpoi49bemdyewqy7ijp9k2ew9nobzu55jgewzov7dk_drone_rules"}}
 		};
 
 		if (geometry == nullptr) {
@@ -98,14 +98,35 @@ public:
 		}
 		// parse result to get flightID
 		std::cout << res << std::endl;
-		auto j = nlohmann::json::parse(res);
 		try {
+			auto j = nlohmann::json::parse(res);
 			flightplanID = j["data"]["id"];
 		}
 		catch (...) {
+			std::cerr << "Flightplan creation failed, cannot parse result" << std::endl;
 			return -1; // failed flight creation!
 		}
 		return 0;
+	}
+
+	int get_rulesets(const std::string &geometry) {
+		std::string url = m_url + "/rules/v1";
+		std::string res;
+//		std::cout << "GEO: " << geometry << std::endl;
+
+		if (CURLE_OK != curl_post(url.c_str(), m_headers, geometry.c_str(), res))
+			return -1;
+		// parse result to get token
+		std::cout << res << std::endl;
+
+		try{
+			auto j = nlohmann::json::parse(res);
+			std::cout << j.dump(4) << std::endl;
+		}
+		catch (...) {
+			std::cout << "Error get rulesets" << std::endl;
+			return -1;
+		}
 	}
 
 	int get_flight_briefing(const std::string& flightplanID) {
@@ -118,7 +139,7 @@ public:
 
 		try{
 			auto j = nlohmann::json::parse(res);
-			//std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
+			std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
 			if (j["data"]["authorizations"].size() == 0) {
 				std::cout << "Briefing result:" << std::endl << j.dump(4) << std::endl;
 				if (j["status"] == "error") {
