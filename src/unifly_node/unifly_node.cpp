@@ -193,6 +193,7 @@ int UniflyNode::request_flight()
 	request["properties"]["pilotMobile"] = "0";
 	request["properties"]["pilotUuid"] = _user_uuid;
 	request["properties"]["crew"]["pilot"] = _user_uuid;
+	request["properties"]["crew"]["contact"]["mobile"] = "0";
 	request["properties"]["crew"]["user"] = _user_uuid;
 	request["properties"]["uas"] = _uas_uuid;
 	request["properties"]["takeOffPosition"] = nlohmann::json({});
