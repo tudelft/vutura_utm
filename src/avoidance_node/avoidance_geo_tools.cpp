@@ -132,3 +132,21 @@ bool latdlond_inside_geofence(position_params &reference_pos, std::vector<std::v
 
 	return ClipperLib::PointInPolygon(target_point_clipper, geofence);
 }
+
+double calc_groundspeed_at_hdg(double gs_n, double gs_e, double wind_n, double wind_e, double hdgd)
+{
+	double hdg		= hdgd / 180. * M_PI;
+	double airspeed_n	= gs_n + wind_n;
+	double airspeed_e	= gs_e + wind_e;
+	double airspeed		= sqrt(pow(airspeed_n,2) + pow(airspeed_e,2));
+	double mag_wind		= sqrt(pow(wind_n,2) + pow(wind_e,2));
+	double wind_n_u		= wind_n / mag_wind;
+	double wind_e_u		= wind_e / mag_wind;
+	double gs_n_u		= cos(hdg);
+	double gs_e_u		= sin(hdg);
+	double wind_to_left	= (gs_e_u * -wind_n_u + wind_e_u * gs_n_u) * mag_wind; // equals needed airspeed to the right
+	double wind_to_front	= (gs_e_u * -wind_e_u + gs_n_u * -wind_n_u) * mag_wind;
+	double gs_at_hdg2	= std::max(0., pow(airspeed + wind_to_front,2) - pow(wind_to_left,2)); // max used to overcome negative squareroot
+	double gs_at_hdg	= sqrt(gs_at_hdg2);
+	return gs_at_hdg;
+}

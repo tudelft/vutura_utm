@@ -65,8 +65,10 @@ private:
 	double _vd;
 	bool _target_wp_available;
 	uint32_t _target_wp;
-	double _wind_north;
-	double _wind_east;
+	double _wind_n;
+	double _wind_e;
+	signed long long _wind_north_scaled;
+	signed long long _wind_east_scaled;
 	double _time_to_target;
 	double _t_lookahead;
 

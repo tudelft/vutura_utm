@@ -30,8 +30,10 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_vd(0),
 	_target_wp_available(0),
 	_target_wp(0),
-	_wind_north(0),
-	_wind_east(0),
+	_wind_n(0),
+	_wind_e(0),
+	_wind_north_scaled(0),
+	_wind_east_scaled(0),
 	_time_to_target(0),
 	_t_lookahead(0),
 	_avoid(false),
@@ -146,6 +148,7 @@ int AvoidanceNode::InitialiseLogger()
 
 int AvoidanceNode::handle_periodic_timer()
 {
+	calc_groundspeed_at_hdg(_vn, _ve, _wind_n, _wind_e, 20.);
 	// every 200ms send velocity vector if a packet was missing
 	AvoidanceVelocity avoidance_velocity;
 	avoidance_velocity.set_avoid(_avoid);
@@ -274,19 +277,23 @@ int AvoidanceNode::handle_gps_position(const GPSMessage &gps_info)
 	}
 	if (gps_info.has_wind_north())
 	{
-		_wind_north = gps_info.wind_north() * 1e-3;
+		_wind_n = gps_info.wind_north() * 1e-3;
+		_wind_north_scaled = Scale_to_clipper(_wind_n);
 	}
 	else
 	{
-		_wind_north = 0.;
+		_wind_n = 0;
+		_wind_north_scaled = 0;
 	}
 	if (gps_info.has_wind_east())
 	{
-		_wind_east = gps_info.wind_east() * 1e-3;
+		_wind_e = gps_info.wind_east() * 1e-3;
+		_wind_east_scaled = Scale_to_clipper(_wind_e);
 	}
 	else
 	{
-		_wind_east = 0.;
+		_wind_e = 0;
+		_wind_east_scaled = 0;
 	}
 	_gps_position_valid = true;
 	_time_gps = getTimeStamp();
@@ -482,8 +489,15 @@ int AvoidanceNode::ConstructSSD()
 	size_t ntraf = _intruders.size();
 	_SSD_v.ARV_scaled.clear();
 	ClipperLib::Clipper c;
-	c.AddPath(_SSD_c.v_c_out, ClipperLib::ptSubject, true);
-	c.AddPath(_SSD_c.v_c_in, ClipperLib::ptSubject, true);
+	ClipperLib::Path v_c_out_wind;
+	ClipperLib::Path v_c_in_wind;
+	for (size_t i = 0; i < _SSD_c.v_c_out.size(); ++i)
+	{
+		v_c_out_wind << ClipperLib::IntPoint(_SSD_c.v_c_out.at(i).X - _wind_east_scaled, _SSD_c.v_c_out.at(i).Y - _wind_north_scaled);
+		v_c_in_wind  << ClipperLib::IntPoint(_SSD_c.v_c_in.at(i).X  - _wind_east_scaled, _SSD_c.v_c_in.at(i).Y  - _wind_north_scaled);
+	}
+	c.AddPath(v_c_out_wind, ClipperLib::ptSubject, true);
+	c.AddPath(v_c_in_wind,  ClipperLib::ptSubject, true);
 
 	// Initialise vector of velocity obstacles for intruders
 	std::vector<ClipperLib::Path> VO_i_paths;
@@ -548,8 +562,15 @@ int AvoidanceNode::SSDResolution()
 
 	ClipperLib::Clipper c;
 	c.AddPaths(_SSD_v.ARV_scaled, ClipperLib::ptSubject, true);
-	c.AddPath(_SSD_c.v_c_set_out, ClipperLib::ptClip, true);
-	c.AddPath(_SSD_c.v_c_set_in, ClipperLib::ptClip, true);
+	ClipperLib::Path v_c_set_out_wind;
+	ClipperLib::Path v_c_set_in_wind;
+	for (size_t i = 0; i < _SSD_c.v_c_out.size(); ++i)
+	{
+		v_c_set_out_wind << ClipperLib::IntPoint(_SSD_c.v_c_set_out.at(i).X - _wind_east_scaled, _SSD_c.v_c_set_out.at(i).Y - _wind_north_scaled);
+		v_c_set_in_wind  << ClipperLib::IntPoint(_SSD_c.v_c_set_in.at(i).X  - _wind_east_scaled, _SSD_c.v_c_set_in.at(i).Y  - _wind_north_scaled);
+	}
+	c.AddPath(v_c_set_out_wind, ClipperLib::ptClip, true);
+	c.AddPath(v_c_set_in_wind, ClipperLib::ptClip, true);
 	_SSD_v.ARV_scaled_speed.clear();
 	c.Execute(ClipperLib::ctIntersection, _SSD_v.ARV_scaled_speed, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
 

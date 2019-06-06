@@ -51,4 +51,7 @@ double Scale_from_clipper(double coord);
 // area check using clipper
 bool latdlond_inside_geofence(position_params& reference_pos, std::vector<std::vector<double>>& geofence_ll, latdlond& target_latdlond);
 
+// airspeed / groundspeed conversion
+double calc_groundspeed_at_hdg(double gs_n, double gs_e, double wind_n, double wind_e, double hdgd);
+
 #endif // AVOIDANCE_GEO_TOOLS_H
