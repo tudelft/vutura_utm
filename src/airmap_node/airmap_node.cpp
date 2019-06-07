@@ -120,7 +120,8 @@ void AirmapNode::handle_position_update(std::string message)
 	gps_msg.ParseFromString(message);
 
 	if (gps_msg.has_lat() && gps_msg.has_lon()) {
-		set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7, gps_msg.alt_msl() * 1e-3, gps_msg.alt_agl() * 1e-3);
+		set_position(gps_msg.lat() * 1e-7, gps_msg.lon() * 1e-7, gps_msg.alt_msl() * 1e-3, gps_msg.alt_agl() * 1e-3,
+			     gps_msg.vn() *  1e-3, gps_msg.ve() * 1e-3, gps_msg.vd() * 1e-3);
 		//std::cout << gps_msg.lat() * 1e-7 << ", " << gps_msg.lon() * 1e-7 << std::endl;
 	}
 }
@@ -388,7 +389,7 @@ int AirmapNode::end_flight() {
 	std::cout << "Flight ended" << std::endl;
 }
 
-int AirmapNode::set_position(float latitude, float longitude, float alt_msl, float alt_agl) {
+int AirmapNode::set_position(float latitude, float longitude, float alt_msl, float alt_agl, float vn, float ve, float vd) {
 	_lat = latitude;
 	_lon = longitude;
 	_alt_msl = alt_msl;
@@ -418,9 +419,9 @@ int AirmapNode::set_position(float latitude, float longitude, float alt_msl, flo
 
 	airmap::telemetry::Speed speed;
 	speed.set_timestamp(getTimeStamp());
-	speed.set_velocity_x(10.0);
-	speed.set_velocity_y(10.0);
-	speed.set_velocity_z(10.0);
+	speed.set_velocity_x(vn);
+	speed.set_velocity_y(ve);
+	speed.set_velocity_z(vd);
 	auto messageSpeed = speed.SerializeAsString();
 	_payload.add<std::uint16_t>(htons(static_cast<std::uint16_t>(Type::speed)))
 			.add<std::uint16_t>(htons(messageSpeed.size()))

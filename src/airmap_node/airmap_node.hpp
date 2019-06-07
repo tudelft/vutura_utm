@@ -39,7 +39,7 @@ public:
 	int start_flight();
 	int end_flight();
 	int get_brief();
-	int set_position(float latitude, float longitude, float alt_msl, float alt_agl);
+	int set_position(float latitude, float longitude, float alt_msl, float alt_agl, float vn, float ve, float vd);
 	std::uint64_t getTimeStamp();
 	int set_armed(bool new_armed_state);
 	int set_geometry(nlohmann::json geofence);
