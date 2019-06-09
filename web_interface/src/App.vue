@@ -139,6 +139,7 @@ export default {
   methods: {
     killHandler() {
       console.log("KILL SIGNAL");
+      this.$socket.emit("kill kill kill");
     },
     dummyAsyncAction() {
       return new Promise(

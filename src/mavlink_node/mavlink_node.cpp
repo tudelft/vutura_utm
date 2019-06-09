@@ -79,7 +79,7 @@ void MavlinkNode::uav_command(std::string command)
 		// do nothing
 
 	} else if (command == "kill kill kill") {
-		std::cout << "kill not implemented yet" << std::endl;
+		send_command_terminate();
 
 	} else if (command == "pause") {
 		send_command_hold();
@@ -387,5 +387,13 @@ void MavlinkNode::send_command_disarm()
 	std::cout << "CMD DISARM" << std::endl;
 	mavlink_message_t msg;
 	mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_COMPONENT_ARM_DISARM, 0, 0, 0, 0, 0, 0, 0, 0);
+	return send_mavlink_message(&msg);
+}
+
+void MavlinkNode::send_command_terminate()
+{
+	std::cout << "CMD TERMINATE" << std::endl;
+	mavlink_message_t msg;
+	mavlink_msg_command_long_pack(MAVLINK_SYSTEM_ID, MAV_COMP_ID_SYSTEM_CONTROL, &msg, 1, 1, MAV_CMD_DO_FLIGHTTERMINATION, 0, 1.0f, 0, 0, 0, 0, 0, 0);
 	return send_mavlink_message(&msg);
 }

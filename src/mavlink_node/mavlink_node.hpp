@@ -39,6 +39,7 @@ private:
 	void send_command_continue();
 	void send_command_land();
 	void send_command_disarm();
+	void send_command_terminate();
 	int _instance;
 	bool _armed;
 	bool _guided_mode;
