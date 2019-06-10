@@ -43,7 +43,7 @@ private:
 	void write_log();
 	void write_traffic_log(std::string acid, double latd, double lond, double alt, double hdg, double gs, double recorded_time, double delay);
 	void traffic_housekeeping(double t_pop_traffic);
-	void statebased_CD(Avoidance_intruder& inntruder);
+	void statebased_CD(Avoidance_intruder& intruder);
 
 	//Requester _avoidance_req;
 	Timer _periodic_timer;
@@ -92,11 +92,6 @@ private:
 	std::map<std::string, Avoidance_intruder*> _intr_avoid; // points to intruders for which a avoidance maneuvre is in progress
 
 	//SSD variables and functions
-	int ConstructSSD();
-	ClipperLib::Paths ConstructGeofencePolygons(Avoidance_intruder& intruder);
-	int SSDResolution();
-	int ResumeNav();
-
 	// To be initialised by the initialisation function
 	struct SSD_config
 	{
@@ -117,4 +112,24 @@ private:
 		ClipperLib::Paths ARV_scaled_speed;
 		ClipperLib::Paths ARV_scaled_geofence;
 	} _SSD_v;
+
+	int ConstructSSD();
+	ClipperLib::Paths ConstructGeofencePolygons(Avoidance_intruder& intruder);
+	int SSDResolution();
+	int ResumeNav();
+
+	// mission management
+	struct Mission_var
+	{
+		bool data_valid = false;
+		double time_to_wp = 0;
+		double hdgd_to_wp = 0;
+		bool wp_occupied = false;
+	};
+	std::vector<Mission_var> _mission_v;
+
+	void MissionManagement();
+	bool check_wp_occupied_in_time(latdlond wp_coor, double time);
+
+
 };

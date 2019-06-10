@@ -16,6 +16,8 @@ Avoidance_intruder::Avoidance_intruder(std::string ac_id, double latd, double lo
 	_groundspeed(gs),
 	_vn(gs * cos(_heading)),
 	_ve(gs * sin(_heading)),
+	_v2(pow(_vn,2) + pow (_ve,2)),
+	_v(sqrt(_v2)),
 	_recorded_time(recorded_time),
 	_received_time(getTimeStamp())
 {
@@ -81,6 +83,16 @@ double Avoidance_intruder::getVn()
 double Avoidance_intruder::getVe()
 {
 		return _ve;
+}
+
+double Avoidance_intruder::getV2()
+{
+		return _v2;
+}
+
+double Avoidance_intruder::getV()
+{
+		return _v;
 }
 
 double Avoidance_intruder::getReceivedTime()
@@ -162,6 +174,8 @@ void Avoidance_intruder::setData(double latd, double lond,
 		_groundspeed = gs;
 		_vn = gs * cos(_heading);
 		_ve = gs * sin(_heading);
+		_v2 = pow(_vn, 2) + pow(_ve , 2);
+		_v = sqrt(_v2);
 		_recorded_time = recorded_time;
 		_received_time = getTimeStamp();
 }

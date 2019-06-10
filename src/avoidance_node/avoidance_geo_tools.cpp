@@ -133,6 +133,16 @@ bool latdlond_inside_geofence(position_params &reference_pos, std::vector<std::v
 	return ClipperLib::PointInPolygon(target_point_clipper, geofence);
 }
 
+bool latdlond_inside_clipperpath(position_params& reference_pos, latdlond& target_latdlond, ClipperLib::Path path)
+{
+	n_e_coordinate target_point_ne = calc_northeast_from_reference(reference_pos, target_latdlond);
+	ClipperLib::IntPoint target_point_clipper;
+	target_point_clipper.X = Scale_to_clipper(target_point_ne.east);
+	target_point_clipper.Y = Scale_to_clipper(target_point_ne.north);
+
+	return ClipperLib::PointInPolygon(target_point_clipper, path);
+}
+
 double calc_groundspeed_at_hdg(double gs_n, double gs_e, double wind_n, double wind_e, double hdgd)
 {
 	double hdg		= hdgd / 180. * M_PI;

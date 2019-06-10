@@ -88,3 +88,8 @@ std::vector<std::vector<double>> Avoidance_geometry::getSoftGeofenceLatdLond()
 {
 	return _soft_geofence;
 }
+
+size_t Avoidance_geometry::getNWpts()
+{
+	return _flightplan.size();
+}

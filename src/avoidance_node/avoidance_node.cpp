@@ -194,6 +194,8 @@ int AvoidanceNode::handle_periodic_timer()
 		write_log();
 	}
 
+	MissionManagement();
+
 	return 0;
 }
 
@@ -930,5 +932,76 @@ int AvoidanceNode::ResumeNav()
 		std::cout << "Resuming Nav" << std::endl;
 	}
 	return 0;
+}
+
+void AvoidanceNode::MissionManagement()
+{
+	// calculate the time, hdg and validity towards waypoint
+	size_t N_points = _avoidance_geometry.getNWpts();
+	std::vector<Mission_var> mission_variables (N_points);
+	_mission_v = mission_variables;
+
+	position_params position = _own_pos;
+	if(_gps_position_valid && _target_wp_available)
+	{
+		double cumulated_time = 0;
+		size_t active_idx = _target_wp;
+		for (size_t i = active_idx; i < N_points; ++i)
+		{
+			n_e_coordinate target_n_e = _avoidance_geometry.getRelWpNorthEast(position, i);
+			double hdg_target = atan2(target_n_e.east, target_n_e.north) / M_PI * 180.;
+			double groundspeed = std::max(0.1, calc_groundspeed_at_hdg(_vn, _ve, _wind_n, _wind_e, hdg_target));
+			double distance = sqrt(pow(target_n_e.east,2) + pow(target_n_e.north,2));
+			double time = distance / groundspeed;
+			cumulated_time += time;
+			_mission_v.at(i).time_to_wp = cumulated_time;
+			_mission_v.at(i).hdgd_to_wp = hdg_target;
+			_mission_v.at(i).data_valid = true;
+			// update position for next loop
+			if (i + 1 < N_points)
+			{
+				latdlond next_latd_lond_ref = _avoidance_geometry.getWpCoordinatesLatLon(i);
+				update_position_params(position, next_latd_lond_ref.latd, next_latd_lond_ref.lond, position.alt);
+			}
+
+			// Check if waypoint is occupied due to intruder(s)
+			for (size_t j = 0; j < _intruders.size() && _mission_v.at(i).wp_occupied == false; ++j)
+			{
+				Avoidance_intruder &intruder = _intruders.at(j);
+				ClipperLib::Path occupied_path_by_intruder;
+				n_e_coordinate intruder_p_ne;
+				intruder_p_ne.north = intruder.getPnRel();
+				intruder_p_ne.east = intruder.getPeRel();
+				n_e_coordinate intruder_v_ne;
+				intruder_v_ne.north = intruder.getVn();
+				intruder_v_ne.east = intruder.getVe();
+				double intruder_speed = intruder.getV();
+				n_e_coordinate intruder_v_ne_normal;
+				intruder_v_ne_normal.north = intruder_v_ne.north / intruder_speed;
+				intruder_v_ne_normal.east = intruder_v_ne.east / intruder_speed;
+				n_e_coordinate intruder_v_ne_perp;
+				intruder_v_ne_perp.north = intruder_v_ne_normal.east;
+				intruder_v_ne_perp.east = -intruder_v_ne_normal.north;
+				// append scaled points to Path
+				double hsepm = _SSD_c.hsepm;
+				occupied_path_by_intruder << ClipperLib::IntPoint(
+								     Scale_to_clipper(intruder_p_ne.east + (-intruder_v_ne_normal.east + intruder_v_ne_perp.east) * hsepm),
+								     Scale_to_clipper(intruder_p_ne.north + (-intruder_v_ne_normal.north + intruder_v_ne_perp.north) * hsepm));
+				occupied_path_by_intruder << ClipperLib::IntPoint(
+								     Scale_to_clipper(intruder_p_ne.east + (-intruder_v_ne_normal.east - intruder_v_ne_perp.east) * hsepm),
+								     Scale_to_clipper(intruder_p_ne.north + (-intruder_v_ne_normal.north - intruder_v_ne_perp.north) * hsepm));
+				occupied_path_by_intruder << ClipperLib::IntPoint(
+								     Scale_to_clipper(intruder_p_ne.east + (intruder_v_ne_normal.east - intruder_v_ne_perp.east) * hsepm + intruder_v_ne.east * cumulated_time),
+								     Scale_to_clipper(intruder_p_ne.north + (intruder_v_ne_normal.north - intruder_v_ne_perp.north) * hsepm + intruder_v_ne.north * cumulated_time));
+				occupied_path_by_intruder << ClipperLib::IntPoint(
+								     Scale_to_clipper(intruder_p_ne.east + (intruder_v_ne_normal.east + intruder_v_ne_perp.east) * hsepm + intruder_v_ne.east * cumulated_time),
+								     Scale_to_clipper(intruder_p_ne.north + (intruder_v_ne_normal.north + intruder_v_ne_perp.north) * hsepm + intruder_v_ne.north * cumulated_time));
+				ClipperLib::IntPoint target_intpoint;
+				target_intpoint.X = Scale_to_clipper(target_n_e.east);
+				target_intpoint.Y = Scale_to_clipper(target_n_e.north);
+				_mission_v.at(i).wp_occupied = ClipperLib::PointInPolygon(target_intpoint, occupied_path_by_intruder);
+			}
+		}
+	}
 }
 
