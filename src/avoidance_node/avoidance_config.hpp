@@ -13,6 +13,7 @@
 #define AVOIDANCE_V_SET 12.0
 #define AVOIDANCE_LOGGING true
 #define AVOIDANCE_AVOID_TO_TARGET true
+#define AVOIDANCE_R_TURN 50.0
 
 class Avoidance_config {
 public:
@@ -31,6 +32,7 @@ public:
         bool getLogging();
         std::string getLogPrefix();
 	bool getAvoidToTarget();
+	double getRTurn();
     
 private:
 
@@ -46,4 +48,5 @@ private:
         bool _logging;
         std::string _log_prefix;
 	bool _avoid_to_target;
+	double _r_turn;
 };

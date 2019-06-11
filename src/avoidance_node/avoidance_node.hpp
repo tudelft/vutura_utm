@@ -124,12 +124,12 @@ private:
 		bool data_valid = false;
 		double time_to_wp = 0;
 		double hdgd_to_wp = 0;
+		double groundspeed = 0;
+		double distance = 0;
 		bool wp_occupied = false;
 	};
 	std::vector<Mission_var> _mission_v;
 
 	void MissionManagement();
-	bool check_wp_occupied_in_time(latdlond wp_coor, double time);
-
-
+	size_t Mission_skip_to_wp();
 };

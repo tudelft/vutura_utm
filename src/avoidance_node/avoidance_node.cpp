@@ -1,4 +1,4 @@
-#include <unistd.h>
+﻿#include <unistd.h>
 #include <cmath>
 #include <iomanip>
 #include <algorithm>
@@ -148,7 +148,6 @@ int AvoidanceNode::InitialiseLogger()
 
 int AvoidanceNode::handle_periodic_timer()
 {
-	calc_groundspeed_at_hdg(_vn, _ve, _wind_n, _wind_e, 20.);
 	// every 200ms send velocity vector if a packet was missing
 	AvoidanceVelocity avoidance_velocity;
 	avoidance_velocity.set_avoid(_avoid);
@@ -956,6 +955,8 @@ void AvoidanceNode::MissionManagement()
 			cumulated_time += time;
 			_mission_v.at(i).time_to_wp = cumulated_time;
 			_mission_v.at(i).hdgd_to_wp = hdg_target;
+			_mission_v.at(i).groundspeed = groundspeed;
+			_mission_v.at(i).distance = distance;
 			_mission_v.at(i).data_valid = true;
 			// update position for next loop
 			if (i + 1 < N_points)
@@ -965,43 +966,133 @@ void AvoidanceNode::MissionManagement()
 			}
 
 			// Check if waypoint is occupied due to intruder(s)
-			for (size_t j = 0; j < _intruders.size() && _mission_v.at(i).wp_occupied == false; ++j)
+//			for (size_t j = 0; j < _intruders.size() && _mission_v.at(i).wp_occupied == false; ++j)
+//			{
+//				Avoidance_intruder &intruder = _intruders.at(j);
+//				ClipperLib::Path occupied_path_by_intruder;
+//				n_e_coordinate intruder_p_ne;
+//				intruder_p_ne.north = intruder.getPnRel();
+//				intruder_p_ne.east = intruder.getPeRel();
+//				n_e_coordinate intruder_v_ne;
+//				intruder_v_ne.north = intruder.getVn();
+//				intruder_v_ne.east = intruder.getVe();
+//				double intruder_speed = intruder.getV();
+//				n_e_coordinate intruder_v_ne_normal;
+//				intruder_v_ne_normal.north = intruder_v_ne.north / intruder_speed;
+//				intruder_v_ne_normal.east = intruder_v_ne.east / intruder_speed;
+//				n_e_coordinate intruder_v_ne_perp;
+//				intruder_v_ne_perp.north = intruder_v_ne_normal.east;
+//				intruder_v_ne_perp.east = -intruder_v_ne_normal.north;
+//				// append scaled points to Path
+//				double hsepm = _SSD_c.hsepm;
+//				occupied_path_by_intruder << ClipperLib::IntPoint(
+//								     Scale_to_clipper(intruder_p_ne.east + (-intruder_v_ne_normal.east + intruder_v_ne_perp.east) * hsepm),
+//								     Scale_to_clipper(intruder_p_ne.north + (-intruder_v_ne_normal.north + intruder_v_ne_perp.north) * hsepm));
+//				occupied_path_by_intruder << ClipperLib::IntPoint(
+//								     Scale_to_clipper(intruder_p_ne.east + (-intruder_v_ne_normal.east - intruder_v_ne_perp.east) * hsepm),
+//								     Scale_to_clipper(intruder_p_ne.north + (-intruder_v_ne_normal.north - intruder_v_ne_perp.north) * hsepm));
+//				occupied_path_by_intruder << ClipperLib::IntPoint(
+//								     Scale_to_clipper(intruder_p_ne.east + (intruder_v_ne_normal.east - intruder_v_ne_perp.east) * hsepm + intruder_v_ne.east * cumulated_time),
+//								     Scale_to_clipper(intruder_p_ne.north + (intruder_v_ne_normal.north - intruder_v_ne_perp.north) * hsepm + intruder_v_ne.north * cumulated_time));
+//				occupied_path_by_intruder << ClipperLib::IntPoint(
+//								     Scale_to_clipper(intruder_p_ne.east + (intruder_v_ne_normal.east + intruder_v_ne_perp.east) * hsepm + intruder_v_ne.east * cumulated_time),
+//								     Scale_to_clipper(intruder_p_ne.north + (intruder_v_ne_normal.north + intruder_v_ne_perp.north) * hsepm + intruder_v_ne.north * cumulated_time));
+//				ClipperLib::IntPoint target_intpoint;
+//				target_intpoint.X = Scale_to_clipper(target_n_e.east);
+//				target_intpoint.Y = Scale_to_clipper(target_n_e.north);
+//				_mission_v.at(i).wp_occupied = ClipperLib::PointInPolygon(target_intpoint, occupied_path_by_intruder);
+//				if (_mission_v.at(i).wp_occupied)
+//				{
+//					std::cout << "Waypoint " << i << " occupied by intruder" << std::endl;
+//				}
+//			}
+		}
+	}
+	Mission_skip_to_wp();
+}
+
+size_t AvoidanceNode::Mission_skip_to_wp()
+{
+	double rpz;
+	double rpz2;
+	double t_threshold = 15.0;
+	double t_margin = 10.0;
+
+	rpz = _avoidance_config.getRPZ() * _avoidance_config.getRPZMarDetect() + _avoidance_config.getRTurn();
+	rpz2 = pow(rpz,2);
+	bool inconf = false;
+	size_t active_idx = _target_wp;
+	std::vector<size_t> idxs_in_range;
+	bool looping = true;
+	// Fill vector of indices that are in range
+	for (size_t i = active_idx; i < _mission_v.size() && looping; ++i)
+	{
+		if (_mission_v.at(i).time_to_wp < t_threshold)
+		{
+			idxs_in_range.push_back(i);
+		}
+		else
+		{
+			looping = false;
+		}
+	}
+
+	for (size_t i = 0; i < _intruders.size() && inconf == false && idxs_in_range.size(); ++i)
+	{
+		Avoidance_intruder &intruder = _intruders.at(i);
+		// Relative variables
+		double vn_rel = intruder.getVnRel();
+		double ve_rel = intruder.getVeRel();
+		double pn_rel = intruder.getPnRel();
+		double pe_rel = intruder.getPeRel();
+		double v2_rel = intruder.getV2Rel();
+		double v_rel  = intruder.getVRel();
+
+		size_t idx = idxs_in_range.at(0); // simplification for now, only look at first point
+		double t_lookahead = _mission_v.at(idx).time_to_wp + t_margin;
+
+		double d2_rel = pow(pn_rel, 2) + pow(pe_rel, 2);
+		// calculation of horizontal conflict variables
+		double t_cpa = - (pn_rel * vn_rel + pe_rel * ve_rel) / (v2_rel);
+		double d_cpa = sqrt(d2_rel - pow(t_cpa, 2) * v2_rel);
+		double d2_cpa = pow(d_cpa, 2);
+
+		double d_in = 0;
+		double d_los = 1e6;
+		double t_los = 1e6;
+		double t_out = 1e6;
+		if ((d_cpa < rpz) && (t_cpa > 0))
+		{
+			d_in = sqrt(rpz2 - d2_cpa);
+			d_los = v_rel * t_cpa - d_in;
+			double dt_in = d_in / v_rel;
+			t_los = t_cpa - dt_in;
+			t_out = t_cpa + dt_in;
+		}
+		inconf = (d_cpa < rpz) && (t_los < t_lookahead) && (t_out > 0);
+		size_t skip_to = _target_wp;
+		// now check if next waypoint must be skipped as well (check if next waypoint is within turn radius)
+		if (inconf && _mission_v.size() > idx + 1)
+		{
+			if (_mission_v.at(idx + 1).distance < _avoidance_config.getRTurn())
 			{
-				Avoidance_intruder &intruder = _intruders.at(j);
-				ClipperLib::Path occupied_path_by_intruder;
-				n_e_coordinate intruder_p_ne;
-				intruder_p_ne.north = intruder.getPnRel();
-				intruder_p_ne.east = intruder.getPeRel();
-				n_e_coordinate intruder_v_ne;
-				intruder_v_ne.north = intruder.getVn();
-				intruder_v_ne.east = intruder.getVe();
-				double intruder_speed = intruder.getV();
-				n_e_coordinate intruder_v_ne_normal;
-				intruder_v_ne_normal.north = intruder_v_ne.north / intruder_speed;
-				intruder_v_ne_normal.east = intruder_v_ne.east / intruder_speed;
-				n_e_coordinate intruder_v_ne_perp;
-				intruder_v_ne_perp.north = intruder_v_ne_normal.east;
-				intruder_v_ne_perp.east = -intruder_v_ne_normal.north;
-				// append scaled points to Path
-				double hsepm = _SSD_c.hsepm;
-				occupied_path_by_intruder << ClipperLib::IntPoint(
-								     Scale_to_clipper(intruder_p_ne.east + (-intruder_v_ne_normal.east + intruder_v_ne_perp.east) * hsepm),
-								     Scale_to_clipper(intruder_p_ne.north + (-intruder_v_ne_normal.north + intruder_v_ne_perp.north) * hsepm));
-				occupied_path_by_intruder << ClipperLib::IntPoint(
-								     Scale_to_clipper(intruder_p_ne.east + (-intruder_v_ne_normal.east - intruder_v_ne_perp.east) * hsepm),
-								     Scale_to_clipper(intruder_p_ne.north + (-intruder_v_ne_normal.north - intruder_v_ne_perp.north) * hsepm));
-				occupied_path_by_intruder << ClipperLib::IntPoint(
-								     Scale_to_clipper(intruder_p_ne.east + (intruder_v_ne_normal.east - intruder_v_ne_perp.east) * hsepm + intruder_v_ne.east * cumulated_time),
-								     Scale_to_clipper(intruder_p_ne.north + (intruder_v_ne_normal.north - intruder_v_ne_perp.north) * hsepm + intruder_v_ne.north * cumulated_time));
-				occupied_path_by_intruder << ClipperLib::IntPoint(
-								     Scale_to_clipper(intruder_p_ne.east + (intruder_v_ne_normal.east + intruder_v_ne_perp.east) * hsepm + intruder_v_ne.east * cumulated_time),
-								     Scale_to_clipper(intruder_p_ne.north + (intruder_v_ne_normal.north + intruder_v_ne_perp.north) * hsepm + intruder_v_ne.north * cumulated_time));
-				ClipperLib::IntPoint target_intpoint;
-				target_intpoint.X = Scale_to_clipper(target_n_e.east);
-				target_intpoint.Y = Scale_to_clipper(target_n_e.north);
-				_mission_v.at(i).wp_occupied = ClipperLib::PointInPolygon(target_intpoint, occupied_path_by_intruder);
+				if (_mission_v.size() > idx + 2)
+				{
+					// skip 2 points
+					skip_to = idx + 2;
+				}
+				else
+				{
+					// skip 1 point
+					skip_to = idx + 1;
+				}
+
+			}
+			else
+			{
+				// skip 1 point
+				skip_to = idx + 1;
 			}
 		}
 	}
 }
-
