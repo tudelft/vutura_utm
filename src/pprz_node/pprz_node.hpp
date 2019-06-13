@@ -49,6 +49,8 @@ union vutura_to_paparazzi_msg_t {
 		int32_t vd;
 		int32_t lat; //[dege7]
 		int32_t lon; //[dege7]
+		bool skip_wp;
+		uint32_t skip_to_wp;
         };
 	unsigned char bytes;
 } __attribute((__packed__));

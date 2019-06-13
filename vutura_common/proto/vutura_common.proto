@@ -33,6 +33,8 @@ message AvoidanceVelocity {
   required sint32 vd = 4; // [m/sE3]
   required sint32 lat = 5; // [degE7]
   required sint32 lon = 6; // [degE7]
+  required bool skip_wp = 7;
+  required uint32 skip_to_wp = 8;
 }
 
 message UavHeartbeat {

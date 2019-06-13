@@ -161,6 +161,8 @@ int PaparazziNode::handle_avoidance(AvoidanceVelocity avoidance_velocity)
         msg.vd = avoidance_velocity.vd();
 	msg.lat = avoidance_velocity.lat();
 	msg.lon = avoidance_velocity.lon();
+	msg.skip_wp = avoidance_velocity.skip_wp();
+	msg.skip_to_wp = avoidance_velocity.skip_to_wp();
 
 	std::string packet((char*)&msg, sizeof(msg));
 	_pprz_comm.send_packet(packet);

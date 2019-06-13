@@ -43,6 +43,8 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_vd_sp(0),
 	_latd_sp(0),
 	_lond_sp(0),
+	_skip_wp(false),
+	_skip_to_wp(0),
 	_logging(false),
 	_intruders()
 {
@@ -156,6 +158,8 @@ int AvoidanceNode::handle_periodic_timer()
 	avoidance_velocity.set_vd(_vd_sp * 1000);
 	avoidance_velocity.set_lat(static_cast<int>(_latd_sp * 1e7));
 	avoidance_velocity.set_lon(static_cast<int>(_lond_sp * 1e7));
+	avoidance_velocity.set_skip_wp(_skip_wp);
+	avoidance_velocity.set_skip_to_wp(static_cast<int>(_skip_to_wp));
 	std::string request = avoidance_velocity.SerializeAsString();
 	//_avoidance_req.send_request(request);
 	_avoidance_pub.publish(request);
@@ -166,12 +170,19 @@ int AvoidanceNode::handle_periodic_timer()
 	_t_lookahead = _avoidance_config.getTLookahead();
 	if (_target_wp_available)
 	{
+		MissionManagement();
 		latdlond target_latdlond = _avoidance_geometry.getWpCoordinatesLatLon(_target_wp);
 		double distance_to_target = calc_distance_from_reference_and_target_latdlond(_own_pos, target_latdlond);
 		double speed = sqrt(pow(_ve,2) + pow(_vn,2));
 		double time_to_target = distance_to_target / speed;
 		_t_lookahead = std::min(time_to_target, _t_lookahead);
 	}
+	if(_skip_wp)
+	{
+		Reset_avoid_params();
+		return 0;
+	}
+
 	for (Avoidance_intruder intruder : _intruders)
 	{
 		statebased_CD(intruder);
@@ -192,9 +203,6 @@ int AvoidanceNode::handle_periodic_timer()
 	{
 		write_log();
 	}
-
-	MissionManagement();
-
 	return 0;
 }
 
@@ -442,11 +450,31 @@ void AvoidanceNode::statebased_CD(Avoidance_intruder& intruder)
 	// Relative variables
 	double pn_rel = intruder.getPnRel();
 	double pe_rel = intruder.getPeRel();
-	double vn_rel = intruder.getVnRel();
-	double ve_rel = intruder.getVeRel();
-	double v2_rel = intruder.getV2Rel();
-	double v_rel  = intruder.getVRel();
 	double d2_rel = intruder.getD2Rel();
+	double vn_rel;
+	double ve_rel;
+	double v2_rel;
+	double v_rel;
+
+	// set heading towards next waypoint as target when not avoiding
+	if (_avoid == false && _target_wp_available)
+	{
+		double hdg_target = _mission_v.at(_target_wp).hdgd_to_wp / 180. * M_PI;
+		double gs_target = _mission_v.at(_target_wp).groundspeed;
+		double vn_target = gs_target * cos(hdg_target);
+		double ve_target = gs_target * sin(hdg_target);
+		vn_rel = vn_target - intruder.getVn();
+		ve_rel = ve_target - intruder.getVe();
+		v2_rel = pow(vn_rel,2) + pow(ve_rel,2);
+		v_rel = sqrt(v2_rel);
+	}
+	else
+	{
+		vn_rel = intruder.getVnRel();
+		ve_rel = intruder.getVeRel();
+		v2_rel = intruder.getV2Rel();
+		v_rel  = intruder.getVRel();
+	}
 
 	// calculation of horizontal conflict variables
 	double t_cpa = - (pn_rel * vn_rel + pe_rel * ve_rel) / (v2_rel);
@@ -702,6 +730,8 @@ int AvoidanceNode::SSDResolution()
 		Avoidance_msg.set_avoid(_avoid);
 		Avoidance_msg.set_lat(static_cast<int>(_latd_sp * 1e7));
 		Avoidance_msg.set_lon(static_cast<int>(_lond_sp * 1e7));
+		Avoidance_msg.set_skip_wp(_skip_wp);
+		Avoidance_msg.set_skip_to_wp(static_cast<int>(_skip_to_wp));
 		std::string avoidance_message = Avoidance_msg.SerializeAsString();
 		_avoidance_pub.publish(avoidance_message);
 	}
@@ -926,6 +956,8 @@ int AvoidanceNode::ResumeNav()
 		Avoidance_msg.set_avoid(_avoid);
 		Avoidance_msg.set_lat(static_cast<int>(_latd_sp * 1e7));
 		Avoidance_msg.set_lon(static_cast<int>(_lond_sp * 1e7));
+		Avoidance_msg.set_skip_wp(_skip_wp);
+		Avoidance_msg.set_skip_to_wp(static_cast<int>(_skip_to_wp));
 		std::string avoidance_message = Avoidance_msg.SerializeAsString();
 		_avoidance_pub.publish(avoidance_message);
 		std::cout << "Resuming Nav" << std::endl;
@@ -1007,25 +1039,25 @@ void AvoidanceNode::MissionManagement()
 //				}
 //			}
 		}
+		Mission_skip_to_wp();
 	}
-	Mission_skip_to_wp();
 }
 
 size_t AvoidanceNode::Mission_skip_to_wp()
 {
 	double rpz;
 	double rpz2;
-	double t_threshold = 15.0;
+	double t_threshold = 30.0;
 	double t_margin = 10.0;
 
 	rpz = _avoidance_config.getRPZ() * _avoidance_config.getRPZMarDetect() + _avoidance_config.getRTurn();
 	rpz2 = pow(rpz,2);
 	bool inconf = false;
-	size_t active_idx = _target_wp;
-	std::vector<size_t> idxs_in_range;
+	uint32_t active_idx = _target_wp;
+	std::vector<uint32_t> idxs_in_range;
 	bool looping = true;
 	// Fill vector of indices that are in range
-	for (size_t i = active_idx; i < _mission_v.size() && looping; ++i)
+	for (uint32_t i = active_idx; i < _mission_v.size() && looping; ++i)
 	{
 		if (_mission_v.at(i).time_to_wp < t_threshold)
 		{
@@ -1037,18 +1069,25 @@ size_t AvoidanceNode::Mission_skip_to_wp()
 		}
 	}
 
+	// Check if wpt(s) must be skipped
+	_skip_to_wp = _target_wp;
+	_skip_wp = false;
 	for (size_t i = 0; i < _intruders.size() && inconf == false && idxs_in_range.size(); ++i)
 	{
 		Avoidance_intruder &intruder = _intruders.at(i);
 		// Relative variables
-		double vn_rel = intruder.getVnRel();
-		double ve_rel = intruder.getVeRel();
 		double pn_rel = intruder.getPnRel();
 		double pe_rel = intruder.getPeRel();
-		double v2_rel = intruder.getV2Rel();
-		double v_rel  = intruder.getVRel();
+		double hdg_target = _mission_v.at(_target_wp).hdgd_to_wp / 180. * M_PI;
+		double gs_target = _mission_v.at(_target_wp).groundspeed;
+		double vn_target = gs_target * cos(hdg_target);
+		double ve_target = gs_target * sin(hdg_target);
+		double vn_rel = vn_target - intruder.getVn();
+		double ve_rel = ve_target - intruder.getVe();
+		double v2_rel = pow(vn_rel,2) + pow(ve_rel,2);
+		double v_rel = sqrt(v2_rel);
 
-		size_t idx = idxs_in_range.at(0); // simplification for now, only look at first point
+		uint32_t idx = idxs_in_range.at(0); // simplification for now, only look at first point
 		double t_lookahead = _mission_v.at(idx).time_to_wp + t_margin;
 
 		double d2_rel = pow(pn_rel, 2) + pow(pe_rel, 2);
@@ -1069,8 +1108,9 @@ size_t AvoidanceNode::Mission_skip_to_wp()
 			t_los = t_cpa - dt_in;
 			t_out = t_cpa + dt_in;
 		}
-		inconf = (d_cpa < rpz) && (t_los < t_lookahead) && (t_out > 0);
-		size_t skip_to = _target_wp;
+		inconf = (d_cpa < rpz) && (t_los < t_lookahead) && (t_out > 0)
+				&& ((t_los > _mission_v.at(idx).time_to_wp) || (t_out > _mission_v.at(idx).time_to_wp))
+				&& (t_los < t_margin);
 		// now check if next waypoint must be skipped as well (check if next waypoint is within turn radius)
 		if (inconf && _mission_v.size() > idx + 1)
 		{
@@ -1079,20 +1119,39 @@ size_t AvoidanceNode::Mission_skip_to_wp()
 				if (_mission_v.size() > idx + 2)
 				{
 					// skip 2 points
-					skip_to = idx + 2;
+					_skip_to_wp = idx + 2;
 				}
 				else
 				{
 					// skip 1 point
-					skip_to = idx + 1;
+					_skip_to_wp = idx + 1;
 				}
-
 			}
 			else
 			{
 				// skip 1 point
-				skip_to = idx + 1;
+				_skip_to_wp = idx + 1;
 			}
+			_skip_wp = true;
 		}
 	}
+}
+
+void AvoidanceNode::Reset_avoid_params()
+{
+	for (std::pair<std::string, Avoidance_intruder*> intruder_pair : _intr_inconf)
+	{
+		Avoidance_intruder* intruder = intruder_pair.second;
+		intruder->setConflictPar(false, 1e6, 1e6, 1e6, 1e6, 1e6);
+
+	}
+	for (std::pair<std::string, Avoidance_intruder*> intruder_pair : _intr_avoid)
+	{
+		Avoidance_intruder* intruder = intruder_pair.second;
+		intruder->setAvoiding(false);
+	}
+
+	_intr_inconf.clear();
+	_intr_avoid.clear();
+	_avoid = false;
 }

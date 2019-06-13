@@ -79,6 +79,8 @@ private:
 	double _vd_sp;
 	double _latd_sp;
 	double _lond_sp;
+	bool _skip_wp;
+	uint32_t _skip_to_wp;
 
 	bool _logging;
 	std::ofstream _logfile;
@@ -132,4 +134,5 @@ private:
 
 	void MissionManagement();
 	size_t Mission_skip_to_wp();
+	void Reset_avoid_params();
 };
