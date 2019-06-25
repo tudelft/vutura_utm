@@ -81,6 +81,9 @@ private:
 	double _lond_sp;
 	bool _skip_wp;
 	uint32_t _skip_to_wp;
+	bool _avoid_off_turn;
+	bool _avoid_left;
+	bool _avoid_right;
 
 	bool _logging;
 	std::ofstream _logfile;
@@ -133,6 +136,9 @@ private:
 	std::vector<Mission_var> _mission_v;
 
 	void MissionManagement();
-	size_t Mission_skip_to_wp();
+	void Mission_skip_to_wp();
+	void Mission_avoid_off_turn();
+	void Mission_avoid_left_right();
+
 	void Reset_avoid_params();
 };

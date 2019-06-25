@@ -45,6 +45,9 @@ AvoidanceNode::AvoidanceNode(int instance, Avoidance_config& config, Avoidance_g
 	_lond_sp(0),
 	_skip_wp(false),
 	_skip_to_wp(0),
+	_avoid_off_turn(false),
+	_avoid_left(true),
+	_avoid_right(true),
 	_logging(false),
 	_intruders()
 {
@@ -177,7 +180,12 @@ int AvoidanceNode::handle_periodic_timer()
 		double time_to_target = distance_to_target / speed;
 		_t_lookahead = std::min(time_to_target, _t_lookahead);
 	}
-	if(_skip_wp)
+//	if(_skip_wp)
+//	{
+//		Reset_avoid_params();
+//		return 0;
+//	}
+	if(_avoid_off_turn)
 	{
 		Reset_avoid_params();
 		return 0;
@@ -580,6 +588,35 @@ int AvoidanceNode::ConstructSSD()
 			c.AddPath(VO_i_paths.at(VO_i_paths.size() - 1), ClipperLib::ptClip, true);
 		}
 	}
+
+	// block right or left side due to wind constraints
+	if (!_avoid_left || !_avoid_right)
+	{
+		double hdg = _mission_v.at(_target_wp).hdgd_to_wp / 180. * M_PI;
+		double coshdg = cos(hdg);
+		double sinhdg = sin(hdg);
+		double leg_size = 10. * _SSD_c.vmax;
+		if (!_avoid_left)
+		{
+			ClipperLib::Path VO_left;
+			VO_left << ClipperLib::IntPoint(Scale_to_clipper(sinhdg * leg_size), Scale_to_clipper(coshdg * leg_size))
+				<< ClipperLib::IntPoint(Scale_to_clipper(coshdg * -leg_size + sinhdg * leg_size), Scale_to_clipper(sinhdg * leg_size + coshdg * leg_size))
+				<< ClipperLib::IntPoint(Scale_to_clipper(coshdg * -leg_size + sinhdg * -leg_size), Scale_to_clipper(sinhdg * leg_size + coshdg * -leg_size))
+				<< ClipperLib::IntPoint(Scale_to_clipper(sinhdg * -leg_size), Scale_to_clipper(coshdg * -leg_size));
+			c.AddPath(VO_left, ClipperLib::ptClip, true);
+		}
+		if (!_avoid_right)
+		{
+			ClipperLib::Path VO_right;
+			VO_right << ClipperLib::IntPoint(Scale_to_clipper(sinhdg * leg_size), Scale_to_clipper(coshdg * leg_size))
+				 << ClipperLib::IntPoint(Scale_to_clipper(sinhdg * -leg_size), Scale_to_clipper(coshdg * -leg_size))
+				 << ClipperLib::IntPoint(Scale_to_clipper(coshdg * leg_size + sinhdg * -leg_size), Scale_to_clipper(sinhdg * -leg_size + coshdg * -leg_size))
+				 << ClipperLib::IntPoint(Scale_to_clipper(coshdg * leg_size + sinhdg * leg_size), Scale_to_clipper(sinhdg * -leg_size + coshdg * leg_size));
+			c.AddPath(VO_right, ClipperLib::ptClip, true);
+		}
+	}
+
+
 	_SSD_v.ARV_scaled.clear();
 	c.Execute(ClipperLib::ctDifference, _SSD_v.ARV_scaled, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
 	return 0;
@@ -996,54 +1033,14 @@ void AvoidanceNode::MissionManagement()
 				latdlond next_latd_lond_ref = _avoidance_geometry.getWpCoordinatesLatLon(i);
 				update_position_params(position, next_latd_lond_ref.latd, next_latd_lond_ref.lond, position.alt);
 			}
-
-			// Check if waypoint is occupied due to intruder(s)
-//			for (size_t j = 0; j < _intruders.size() && _mission_v.at(i).wp_occupied == false; ++j)
-//			{
-//				Avoidance_intruder &intruder = _intruders.at(j);
-//				ClipperLib::Path occupied_path_by_intruder;
-//				n_e_coordinate intruder_p_ne;
-//				intruder_p_ne.north = intruder.getPnRel();
-//				intruder_p_ne.east = intruder.getPeRel();
-//				n_e_coordinate intruder_v_ne;
-//				intruder_v_ne.north = intruder.getVn();
-//				intruder_v_ne.east = intruder.getVe();
-//				double intruder_speed = intruder.getV();
-//				n_e_coordinate intruder_v_ne_normal;
-//				intruder_v_ne_normal.north = intruder_v_ne.north / intruder_speed;
-//				intruder_v_ne_normal.east = intruder_v_ne.east / intruder_speed;
-//				n_e_coordinate intruder_v_ne_perp;
-//				intruder_v_ne_perp.north = intruder_v_ne_normal.east;
-//				intruder_v_ne_perp.east = -intruder_v_ne_normal.north;
-//				// append scaled points to Path
-//				double hsepm = _SSD_c.hsepm;
-//				occupied_path_by_intruder << ClipperLib::IntPoint(
-//								     Scale_to_clipper(intruder_p_ne.east + (-intruder_v_ne_normal.east + intruder_v_ne_perp.east) * hsepm),
-//								     Scale_to_clipper(intruder_p_ne.north + (-intruder_v_ne_normal.north + intruder_v_ne_perp.north) * hsepm));
-//				occupied_path_by_intruder << ClipperLib::IntPoint(
-//								     Scale_to_clipper(intruder_p_ne.east + (-intruder_v_ne_normal.east - intruder_v_ne_perp.east) * hsepm),
-//								     Scale_to_clipper(intruder_p_ne.north + (-intruder_v_ne_normal.north - intruder_v_ne_perp.north) * hsepm));
-//				occupied_path_by_intruder << ClipperLib::IntPoint(
-//								     Scale_to_clipper(intruder_p_ne.east + (intruder_v_ne_normal.east - intruder_v_ne_perp.east) * hsepm + intruder_v_ne.east * cumulated_time),
-//								     Scale_to_clipper(intruder_p_ne.north + (intruder_v_ne_normal.north - intruder_v_ne_perp.north) * hsepm + intruder_v_ne.north * cumulated_time));
-//				occupied_path_by_intruder << ClipperLib::IntPoint(
-//								     Scale_to_clipper(intruder_p_ne.east + (intruder_v_ne_normal.east + intruder_v_ne_perp.east) * hsepm + intruder_v_ne.east * cumulated_time),
-//								     Scale_to_clipper(intruder_p_ne.north + (intruder_v_ne_normal.north + intruder_v_ne_perp.north) * hsepm + intruder_v_ne.north * cumulated_time));
-//				ClipperLib::IntPoint target_intpoint;
-//				target_intpoint.X = Scale_to_clipper(target_n_e.east);
-//				target_intpoint.Y = Scale_to_clipper(target_n_e.north);
-//				_mission_v.at(i).wp_occupied = ClipperLib::PointInPolygon(target_intpoint, occupied_path_by_intruder);
-//				if (_mission_v.at(i).wp_occupied)
-//				{
-//					std::cout << "Waypoint " << i << " occupied by intruder" << std::endl;
-//				}
-//			}
 		}
 		Mission_skip_to_wp();
+		Mission_avoid_off_turn();
+		Mission_avoid_left_right();
 	}
 }
 
-size_t AvoidanceNode::Mission_skip_to_wp()
+void AvoidanceNode::Mission_skip_to_wp()
 {
 	double rpz;
 	double rpz2;
@@ -1134,6 +1131,53 @@ size_t AvoidanceNode::Mission_skip_to_wp()
 			}
 			_skip_wp = true;
 		}
+	}
+}
+
+void AvoidanceNode::Mission_avoid_off_turn()
+{
+	size_t active_idx = _target_wp;
+	double hdg = _mission_v.at(active_idx).hdgd_to_wp / 180. * M_PI;
+	double pn_u = cos(hdg);
+	double pe_u = sin(hdg);
+
+	double gs = sqrt(pow(_vn, 2) + pow(_ve, 2));
+	double vn_u = _vn / gs;
+	double ve_u = _ve / gs;
+
+	double dotpv = pn_u * vn_u + pe_u * ve_u;
+
+	if (dotpv <= 0)
+	{
+		_avoid_off_turn = true;
+	}
+	else
+	{
+		_avoid_off_turn = false;
+	}
+}
+
+void AvoidanceNode::Mission_avoid_left_right()
+{
+	size_t active_idx = _target_wp;
+	double windspeed = sqrt(pow(_wind_n, 2) + pow(_wind_e, 2));
+	double wn_u = _wind_n / windspeed;
+	double we_u = _wind_e / windspeed;
+	double hdg = _mission_v.at(active_idx).hdgd_to_wp / 180. * M_PI;
+	double pn_u = cos(hdg);
+	double pe_u = sin(hdg);
+
+	double crosspw = pe_u * -wn_u + pn_u * we_u;
+
+	if (crosspw > 0)
+	{
+		_avoid_left = true;
+		_avoid_right = false;
+	}
+	else
+	{
+		_avoid_left = false;
+		_avoid_right = true;
 	}
 }
 
