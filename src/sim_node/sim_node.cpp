@@ -96,7 +96,8 @@ void update_position_params(position_params& pos, double latd, double lond, doub
 SimNode::SimNode(int instance) :
 	_periodic_timer(this),
 	_gps_pub(socket_name(SOCK_PUBSUB_GPS_POSITION, instance)),
-	_angle(0.0f)
+	_angle(0.0f),
+	_instance(instance)
 {
 
 }
@@ -155,6 +156,11 @@ int SimNode::handle_periodic_timer()
 	gps_message.set_timestamp(0);
 	gps_message.set_lat(new_position.latd*1e7);
 	gps_message.set_lon(new_position.lond*1e7);
+
+	// temp field
+	gps_message.set_lat((51.991282409719666 - 0.00026426547214697393 * _instance) * 1e7);
+	gps_message.set_lon((4.377976655960083 + 0.00021457672119140625 * _instance) * 1e7);
+
 	gps_message.set_alt_msl(45000);
 	gps_message.set_alt_agl(45000);
 

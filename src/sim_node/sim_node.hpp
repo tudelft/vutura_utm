@@ -44,6 +44,8 @@ private:
 	Timer _periodic_timer;
 	Publisher _gps_pub;
 
+	int _instance;
+
 	position_params _pos;
 	float _angle;
 
