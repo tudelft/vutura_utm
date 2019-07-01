@@ -178,7 +178,7 @@ int AvoidanceNode::handle_periodic_timer()
 		double distance_to_target = calc_distance_from_reference_and_target_latdlond(_own_pos, target_latdlond);
 		double speed = sqrt(pow(_ve,2) + pow(_vn,2));
 		double time_to_target = distance_to_target / speed;
-		_t_lookahead = std::min(time_to_target, _t_lookahead);
+		_t_lookahead = std::max(0.,std::min(time_to_target - 10.0, _t_lookahead));
 	}
 //	if(_skip_wp)
 //	{
@@ -234,7 +234,7 @@ int AvoidanceNode::handle_traffic(const TrafficInfo &traffic)
 	double lond_i = traffic.lon() * 1e-7;
 	double alt_i = traffic.alt() * 1e-3;
 	double hdg_i = traffic.heading();
-	double gs_i = traffic.groundspeed() * AVOIDANCE_KTS * 1e-3;
+	double gs_i = traffic.groundspeed() * 1e-3;
 	double recorded_time_i = traffic.recorded_time();// * 1e-3;
 	double delay = getTimeStamp() - recorded_time_i;
 	if (_logging)
@@ -1161,8 +1161,8 @@ void AvoidanceNode::Mission_avoid_left_right()
 {
 	size_t active_idx = _target_wp;
 	double windspeed = sqrt(pow(_wind_n, 2) + pow(_wind_e, 2));
-	double wn_u = _wind_n / windspeed;
-	double we_u = _wind_e / windspeed;
+	double wn_u = 0.;//_wind_n / windspeed;
+	double we_u = -1.; //_wind_e / windspeed;
 	double hdg = _mission_v.at(active_idx).hdgd_to_wp / 180. * M_PI;
 	double pn_u = cos(hdg);
 	double pe_u = sin(hdg);
