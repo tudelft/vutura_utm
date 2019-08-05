@@ -63,7 +63,7 @@ The [cryptopp library](https://github.com/bartslinger/cryptopp) can be compiled 
 
 ```
 cd $HOME/git
-git clone https://github.com/bartslinger/cryptopp/tree/cross_compile
+git clone -b cross_compile https://github.com/bartslinger/cryptopp
 cd cryptopp
 export ARM_EMBEDDED_TOOLCHAIN=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin
 export ARM_EMBEDDED_SYSROOT=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/arm-linux-gnueabihf
