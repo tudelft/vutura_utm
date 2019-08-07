@@ -69,6 +69,7 @@ export ARM_EMBEDDED_TOOLCHAIN=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gn
 export ARM_EMBEDDED_SYSROOT=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/arm-linux-gnueabihf
 source ./setenv-rpi.sh
 make -f GNUmakefile-cross
+make install PREFIX=$HOME/rpi_staging
 ```
 
 ### OpenSSL
