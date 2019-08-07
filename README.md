@@ -73,17 +73,39 @@ make -f GNUmakefile-cross
 
 ### OpenSSL
 
-The following commands will install the openSSL library files in $HOME/rpi_staging.
+The following commands will install the OpenSSL library files in $HOME/rpi_staging.
 
 ```
 cd $HOME/git
-git clone https://github.com/openssl/openssl
+git clone -b OpenSSL_1_1_1-stable https://github.com/openssl/openssl
 cd openssl
 export PATH=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin:$PATH
 ./configure linux-generic32 --prefix=$HOME/rpi_staging
 make CC=arm-linux-gnueabihf-gcc
 make install
 ```
+
+### Protobuf
+
+Two different parts are needed: The protobuf compiler which runs on the host machine, and the protobuf library which should be installed to the RPi. The compiler can be installed with the following command:
+
+```
+sudo apt install protobuf-compiler
+protoc --version
+```
+
+If the version is not 3.0.0, uninstall it and download the correct version from here https://github.com/protocolbuffers/protobuf/releases.
+
+To compile the protobuf library for RPi, follow these instructions:
+
+```
+cd $HOME/git/
+git clone --branch v3.0.0 --recurse-submodules https://github.com/protocolbuffers/protobuf.git
+cd protobuf
+./autogen.sh
+./configure --host=arm-linux-gnueabihf CC=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc CXX=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnueabihf-g++ --with-protoc=/usr/bin/protoc --prefix=$HOME/rpi_staging
+```
+
 
 ## Run instructions
 
