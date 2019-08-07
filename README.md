@@ -130,11 +130,25 @@ cmake -Bbuild -H. -DPAHO_WITH_SSL=ON \
 -DOPENSSL_LIB=$HOME/rpi_staging/libssl.a \
 -DOPENSSLCRYPTO_LIB=$HOME/rpi_staging/libcrypto.a \
 -DCMAKE_INSTALL_PREFIX=$HOME/rpi_staging
-sudo cmake --build build/ --target install
-sudo ldconfig
-
+cmake --build build/ --target install
 ```
 
+And compile mqtt for c++
+
+```
+cd $HOME/git
+git clone https://github.com/eclipse/paho.mqtt.c.git
+cd paho.mqtt.cpp
+git checkout v1.0.1
+cmake -Bbuild -H. -DPAHO_WITH_SSL=ON \
+-DCMAKE_PREFIX_PATH=$HOME/rpi_staging/ \
+-DCMAKE_TOOLCHAIN_FILE=$HOME/git/vutura_utm/toolchains/rpi-toolchain.cmake \
+-DOPENSSL_INCLUDE_DIR=$HOME/rpi_staging/include/openssl \
+-DOPENSSL_LIB=$HOME/rpi_staging/libssl.a \
+-DOPENSSLCRYPTO_LIB=$HOME/rpi_staging/libcrypto.a \
+-DCMAKE_INSTALL_PREFIX=$HOME/rpi_staging
+cmake --build build/ --target install
+```
 
 ## Run instructions
 
