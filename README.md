@@ -137,7 +137,7 @@ And compile mqtt for c++
 
 ```
 cd $HOME/git
-git clone https://github.com/eclipse/paho.mqtt.c.git
+git clone https://github.com/eclipse/paho.mqtt.cpp.git
 cd paho.mqtt.cpp
 git checkout v1.0.1
 cmake -Bbuild -H. -DPAHO_WITH_SSL=ON \
@@ -148,6 +148,31 @@ cmake -Bbuild -H. -DPAHO_WITH_SSL=ON \
 -DOPENSSLCRYPTO_LIB=$HOME/rpi_staging/libcrypto.a \
 -DCMAKE_INSTALL_PREFIX=$HOME/rpi_staging
 cmake --build build/ --target install
+```
+
+### Curl
+
+```
+cd $HOME/git
+git clone --branch curl-7_65_3 https://github.com/curl/curl.git
+cd curl
+
+export PATH=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin:$PATH
+
+export ROOTDIR="$HOME/rpi_staging"
+export CROSS_COMPILE="arm-linux-gnueabihf"
+export CPPFLAGS="-I${ROOTDIR}/include"
+export LDFLAGS="-L${ROOTDIR}/lib"
+export AR=${CROSS_COMPILE}-ar
+export AS=${CROSS_COMPILE}-as
+export LD=${CROSS_COMPILE}-ld
+export RANLIB=${CROSS_COMPILE}-ranlib
+export CC=${CROSS_COMPILE}-gcc
+export NM=${CROSS_COMPILE}-nm
+export LIBS="-lssl -lcrypto"
+
+./configure --prefix=$HOME/rpi_staging --target=${CROSS_COMPILE} --host=${CROSS_COMPILE} --with-ssl
+
 ```
 
 ## Run instructions
