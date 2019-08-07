@@ -99,7 +99,7 @@ If the version is not 3.0.0, uninstall it and download the correct version from 
 To compile the protobuf library for RPi, follow these instructions:
 
 ```
-cd $HOME/git/
+cd $HOME/git
 git clone --branch v3.9.1 --recurse-submodules https://github.com/protocolbuffers/protobuf.git
 cd protobuf
 ```
@@ -113,6 +113,26 @@ CXX=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnue
 --with-protoc=/usr/bin/protoc \
 --prefix=$HOME/rpi_staging
 make && make install
+```
+
+### MQTT
+
+The mqtt library for c++ requires the c library first
+
+```
+cd $HOME/git
+git clone https://github.com/eclipse/paho.mqtt.c.git
+cd paho.mqtt.c
+git checkout v1.2.1
+cmake -Bbuild -H. -DPAHO_WITH_SSL=ON \
+-DCMAKE_TOOLCHAIN_FILE=$HOME/git/vutura_utm/toolchains/rpi-toolchain.cmake \
+-DOPENSSL_INCLUDE_DIR=$HOME/rpi_staging/include/openssl \
+-DOPENSSL_LIB=$HOME/rpi_staging/libssl.a \
+-DOPENSSLCRYPTO_LIB=$HOME/rpi_staging/libcrypto.a \
+-DCMAKE_INSTALL_PREFIX=$HOME/rpi_staging
+sudo cmake --build build/ --target install
+sudo ldconfig
+
 ```
 
 
