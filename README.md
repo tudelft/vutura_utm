@@ -100,10 +100,19 @@ To compile the protobuf library for RPi, follow these instructions:
 
 ```
 cd $HOME/git/
-git clone --branch v3.0.0 --recurse-submodules https://github.com/protocolbuffers/protobuf.git
+git clone --branch v3.9.1 --recurse-submodules https://github.com/protocolbuffers/protobuf.git
 cd protobuf
+```
+Google removed the original file, so open autogen.sh with a text editor and change the gmock url on line 34 to: https://github.com/google/googlemock/archive/release-1.7.0.zip
+
+```
+sudo apt-get install autoconf automake libtool curl make g++ unzip
 ./autogen.sh
-./configure --host=arm-linux-gnueabihf CC=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc CXX=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnueabihf-g++ --with-protoc=/usr/bin/protoc --prefix=$HOME/rpi_staging
+./configure --host=arm-linux-gnueabihf CC=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc \
+CXX=$HOME/git/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnueabihf-g++ \
+--with-protoc=/usr/bin/protoc \
+--prefix=$HOME/rpi_staging
+make && make install
 ```
 
 
