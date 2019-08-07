@@ -173,6 +173,7 @@ export LIBS="-lssl -lcrypto"
 
 ./configure --prefix=$HOME/rpi_staging --target=${CROSS_COMPILE} --host=${CROSS_COMPILE} --with-ssl
 
+make && make install
 ```
 
 ## Run instructions
