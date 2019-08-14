@@ -8,10 +8,12 @@ import json
 import vutura_common_pb2
 import dateutil.parser
 
+import requests
+  
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
 traffic_pub = nanomsg.Socket(nanomsg.PUB)
-traffic_pub.bind('tcp://0.0.0.0:8340'.encode('utf-8'))
+traffic_pub.bind('tcp://0.0.0.0:8340')
 
 def onconnect(socket):
     logging.info("on connect got called")
@@ -50,9 +52,11 @@ def onTraffic(key, object):
             traffic_message.lat = round(item["location"]["latitude"] * 1e7)
             traffic_message.lon = round(item["location"]["longitude"] * 1e7)
             traffic_message.alt = round(item["altitude"]["value"] * 1e3)
-            traffic_message.groundspeed = 0
-            traffic_message.heading = 0
-            traffic_pub.send(traffic_message.SerializeToString())
+            traffic_message.groundspeed = round(item["aircraftData"]["groundSpeed"] * 1e3 * 0.5144447)
+            traffic_message.heading = round(item["heading"]["trueHeading"])
+
+            if traffic_message.lat > 515000000 and traffic_message.lat < 525000000 and traffic_message.lon > 40000000 and traffic_message.lon < 50000000:
+                traffic_pub.send(traffic_message.SerializeToString())
             #if (item["identification"] == "flight|G8ywkEn8JZ7N6hg2nywOXg8voKulqoa72wDYZyOHWBPanvQNDZk5"):
             print(json.dumps(item, indent=4))
     except:
@@ -68,12 +72,32 @@ def onSubAck(channel, error, object):
     
     
 if __name__ == "__main__":
+
+
+    print("Try to get token")
+
+
+    headers = {'content-type': 'application/x-www-form-urlencoded',
+                              'authorization': 'Basic dHVkZWxmdFZ1dHVyYUNvbm5lY3Q6dHVEZWxmdDIwMTkwM1Z1dHVyYQ==',
+                                                        'accept': 'application/json'}
+    payload = "username=b.j.m.m.slinger@tudelft.nl&password=********************************************************************************************&grant_type=password"
+
+    r = requests.post("https://vutura.unifly.tech/oauth/token", data=payload, headers=headers)
+
+    token = (r.json()["access_token"])
+    print(token)
+
+    # write to file
+    token_file = open("~/unifly/token.txt", "w")
+    token_file.write(token)
+    token_file.close()
+
     socket = Socketcluster.socket("wss://vutura.unifly.tech:443/socketcluster/")
     socket.setBasicListener(onconnect, ondisconnect, onConnectError)
     socket.setAuthenticationListener(onSetAuthentication, onAuthentication)
 
     # read token from file
-    f = open('/home/bart/unifly/token.txt', 'r')
+    f = open('~/unifly/token.txt', 'r')
     token = f.readline().rstrip()
 
     onSetAuthentication(socket, token)
@@ -81,3 +105,4 @@ if __name__ == "__main__":
     # listen to channel
 
     socket.connect()
+
